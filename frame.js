@@ -62,17 +62,35 @@ function coinOgSvg(coin) {
 </svg>`;
 }
 
-/** 1024x1024 app icon (summery sun + M monogram). SVG scales for the 200x200 splash too. NOTE: a public
- *  Farcaster listing wants a 1024x1024 PNG with NO alpha — rasterize this (the solid cream bg satisfies no-alpha). */
+/** 1024x1024 app icon: a summery sun with a rising price-tick (coin the moment + momentum). FONT-FREE (pure
+ *  shapes) so it rasterizes cleanly to PNG. The solid cream bg satisfies the Farcaster "1024² PNG, no alpha" rule. */
 function appIconSvg() {
   const rays = [0, 45, 90, 135, 180, 225, 270, 315]
-    .map((d) => `<line x1="512" y1="150" x2="512" y2="250" transform="rotate(${d} 512 512)"/>`).join('');
+    .map((d) => `<line x1="512" y1="118" x2="512" y2="224" transform="rotate(${d} 512 512)"/>`).join('');
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
 <defs><linearGradient id="s" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFD23D"/><stop offset=".5" stop-color="#FF9A00"/><stop offset="1" stop-color="#FF6A00"/></linearGradient></defs>
 <rect width="1024" height="1024" fill="#FFF3DE"/>
-<g stroke="url(#s)" stroke-width="46" stroke-linecap="round">${rays}</g>
-<circle cx="512" cy="512" r="252" fill="url(#s)"/>
-<text x="512" y="612" font-family="ui-monospace,SFMono-Regular,monospace" font-weight="800" font-size="300" fill="#2A1A05" text-anchor="middle">M</text>
+<g stroke="#FFB81C" stroke-width="44" stroke-linecap="round">${rays}</g>
+<circle cx="512" cy="512" r="272" fill="url(#s)"/>
+<path d="M372 566 L486 452 L556 522 L648 408" fill="none" stroke="#FFF7E6" stroke-width="46" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="648" cy="408" r="30" fill="#FFF7E6"/>
+</svg>`;
+}
+
+/** 1200x630 hero / OG card: sun mark + wordmark + tagline (summery DA). Served at /hero.svg. */
+function appOgSvg() {
+  const rays = [0, 45, 90, 135, 180, 225, 270, 315]
+    .map((d) => `<line x1="250" y1="132" x2="250" y2="184" transform="rotate(${d} 250 315)"/>`).join('');
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFD23D"/><stop offset=".5" stop-color="#FF9A00"/><stop offset="1" stop-color="#FF6A00"/></linearGradient></defs>
+<rect width="1200" height="630" fill="#FFF3DE"/>
+<rect width="1200" height="14" fill="url(#g)"/>
+<g stroke="#FFB81C" stroke-width="20" stroke-linecap="round">${rays}</g>
+<circle cx="250" cy="315" r="122" fill="url(#g)"/>
+<path d="M188 352 L240 300 L272 332 L322 268" fill="none" stroke="#FFF7E6" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="430" y="298" font-family="system-ui,Segoe UI,sans-serif" font-weight="800" font-size="94" fill="#2A1A05">MomentMint</text>
+<text x="434" y="368" font-family="ui-monospace,monospace" font-size="34" fill="#EB5E00">coin the moment in one tap · on Base</text>
+<text x="434" y="430" font-family="system-ui,sans-serif" font-size="29" fill="#7A6336">a tweet, a goal, a cast becomes a tradeable coin. creator earns 40%.</text>
 </svg>`;
 }
 
@@ -82,15 +100,17 @@ function appIconSvg() {
 function farcasterManifest(opts = {}) {
   const appUrl = (opts.appUrl || 'https://momentmint-production.up.railway.app').replace(/\/$/, '');
   const domain = (opts.domain || appUrl).replace(/^https?:\/\//, '').replace(/\/.*$/, '');
-  const icon = opts.iconUrl || (appUrl + '/icon.svg');
+  const icon = opts.iconUrl || (appUrl + '/icon.png');         // real 1024² PNG (no alpha); env can override
+  const splash = opts.splashImageUrl || (appUrl + '/splash.png'); // 200²
+  const og = opts.ogImageUrl || (appUrl + '/hero.png');        // 1200x630
   return {
     accountAssociation: opts.accountAssociation || { header: '', payload: '', signature: '' }, // ← operator signs `domain`; empty = pending
     miniapp: {
       version: '1',
       name: 'MomentMint',                                       // <=32
       homeUrl: appUrl,                                          // <=1024
-      iconUrl: icon,                                            // 1024x1024 PNG (no alpha) for a public listing
-      splashImageUrl: opts.splashImageUrl || icon,             // 200x200
+      iconUrl: icon,                                            // 1024x1024 PNG (no alpha)
+      splashImageUrl: splash,                                  // 200x200
       splashBackgroundColor: SPLASH_BG,                        // hex
       subtitle: 'Coin the moment on Base',                     // <=30, no emoji
       description: 'Turn a moment, a tweet or a cast into a tradeable coin in one tap on Base. The creator earns 40 percent of trades. Time-boxed and speculative.', // <=170
@@ -99,8 +119,8 @@ function farcasterManifest(opts = {}) {
       tagline: 'Coin the moment in one tap',                   // <=30
       ogTitle: 'MomentMint',                                   // <=30
       ogDescription: 'Coin a moment, a tweet or a cast on Base.', // <=100
-      ogImageUrl: opts.ogImageUrl || icon,                     // 1200x630 PNG
-      heroImageUrl: opts.heroImageUrl || opts.ogImageUrl || icon, // 1200x630
+      ogImageUrl: og,                                          // 1200x630 PNG
+      heroImageUrl: opts.heroImageUrl || og,                   // 1200x630
       canonicalDomain: domain,                                 // no protocol/port/path
       noindex: false,
       requiredChains: ['eip155:8453'],                         // Base (CAIP-2)
@@ -109,7 +129,7 @@ function farcasterManifest(opts = {}) {
   };
 }
 
-module.exports = { miniAppEmbed, coinSharePage, coinOgSvg, appIconSvg, farcasterManifest };
+module.exports = { miniAppEmbed, coinSharePage, coinOgSvg, appIconSvg, appOgSvg, farcasterManifest };
 
 // ---- SELF-TEST (the checker) ---------------------------------------------
 if (require.main === module) {
