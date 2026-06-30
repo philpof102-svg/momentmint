@@ -247,7 +247,8 @@ walletReady=(async()=>{ try{
 // REAL on-chain mint via clanker-sdk v4 (grounded on clanker.gitbook.io/sdk/v4.0.0). The USER signs with their
 // Farcaster wallet — the app never holds a key. Runs ONLY when a wallet is present (gated in coinIt); a plain
 // browser stays in descriptor-preview demo. ⚠️ Needs final testing in a real Farcaster client + funded wallet.
-async function mintOnChain(coin, ref){
+async function mintOnChain(descriptor){           // consume the GROUNDED + validated backend descriptor; the USER signs
+  if(!descriptor || !descriptor.params) throw new Error('no mint plan from server — try again');
   let Clanker, viem, base;
   try{                                            // load the mint SDK from the CDN; surface a clear error if it can't
     const m = await Promise.all([
@@ -260,15 +261,12 @@ async function mintOnChain(coin, ref){
   const publicClient = viem.createPublicClient({ chain: base, transport: viem.http() });
   const walletClient = viem.createWalletClient({ account: wallet, chain: base, transport: viem.custom(walletProvider) });
   const clanker = new Clanker({ publicClient, wallet: walletClient });
+  const p = descriptor.params;                      // name/symbol/image/rewards/fees(static 1%)/context — all grounded server-side
+  // the server uses the platform addr as a placeholder for both slots; swap recipients[0] (creator) to the signer
+  const recipients = (p.rewards && p.rewards.recipients || []).map((r,i)=> i===0 ? { ...r, recipient: wallet, admin: wallet } : r);
   const { waitForTransaction } = await clanker.deploy({
-    name: coin.nm, symbol: coin.tk, tokenAdmin: wallet, image: coin.image || '',
-    context: { interface: 'MomentMint', platform: 'farcaster', messageId: ref, id: '' },
-    rewards: { recipients: [
-      { recipient: wallet, admin: wallet, bps: 5000, token: 'Both' },           // creator (the user) — 50% of the reward pool
-      { recipient: PLATFORM_ADDR, admin: PLATFORM_ADDR, bps: 5000, token: 'Both' }, // MomentMint — 50% (the platform cut)
-    ] },
-    // fees: LEFT TO THE clanker-sdk DEFAULT (standard Clanker fee). Do NOT hardcode an ungrounded fee/units —
-    // confirm the exact fee config in the FIRST human-signed test deploy + verify on-chain accrual (INTEGRATION.md).
+    name: p.name, symbol: p.symbol, image: p.image || '', tokenAdmin: wallet,
+    context: p.context, rewards: { recipients }, fees: p.fees,
   });
   const { address } = await waitForTransaction();
   return address;
@@ -314,7 +312,7 @@ async function coinIt(){ if(!cur)return; const card=document.getElementById('car
   }catch(e){ /* offline → demo */ }
   if(wallet){                                     // real on-chain mint — the USER signs in their Farcaster wallet
     toast('●','Minting $'+cur.tk+' — confirm in your wallet…');
-    try{ await walletReady; mintedAddr=await mintOnChain(cur, ref); }   // wait for the connect attempt, then the user signs
+    try{ await walletReady; mintedAddr=await mintOnChain(descriptor); }   // wait for the connect attempt, then the user signs the grounded descriptor
     catch(e){ toast('●','Mint cancelled — '+String(e&&e.message||'').slice(0,44));  // FAILED → no fake LIVE card; let them retry
       document.getElementById('coinbtn').disabled=false; document.querySelectorAll('.chip').forEach(x=>x.classList.remove('sel')); return; }
     toast('●','Live! $'+cur.tk+' minted'+(mintedAddr?' '+mintedAddr.slice(0,8)+'…':''));

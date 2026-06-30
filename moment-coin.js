@@ -10,15 +10,20 @@
  *
  * 🛑 SAFETY (fleet rule): DESCRIPTOR-ONLY. NEVER signs, NEVER deploys, NEVER moves funds. Returns
  *   `signed:false` + `execution:'FORBIDDEN'`; a HUMAN/relayer signs the Clanker deploy. No sdk/send/sign/deploy here.
- * ⚠️ GROUNDING: the exact Clanker v4 SDK call + partner-fee-slot wiring must be confirmed against
- *   clanker.gitbook.io / pool.fans/docs (P1). This models the INTENT; `sdkBinding` flags the integration point.
+ * ✓ GROUNDED (clanker.gitbook.io creator-rewards-and-fees + sdk/v4.0.0, 2026-06-30): deploy() with
+ *   rewards.recipients[].bps (total 10000) + fees.static (100 bps = 1% default) + context. Clanker keeps 20% of LP
+ *   fees; recipients split the other 80%. NO separate interface bonus (context.interface = clanker.world provenance
+ *   only). P1 left: confirm exact on-chain accrual in ONE human-signed test deploy.
  * HONESTY: Clanker tokens have no native pause, so the time-box is APP-LEVEL (featuring), not an on-chain freeze.
  *
  * No external deps — plain node. `node moment-coin.js` runs the self-test (the checker).
  */
 
-const CLANKER_FEE_BPS = 20;             // Clanker v4: 0.20% swap fee (20 bps)
-const SPLIT = { interface: 40, creator: 40, clanker: 20 }; // partner-interface deploy split (% of the fee)
+// Fee model GROUNDED on clanker.gitbook.io (creator-rewards-and-fees + sdk/v4.0.0), 2026-06-30:
+const SWAP_FEE_BPS = 100;               // Clanker v4 static-pool DEFAULT = 1% swap fee (100 bps) on each token input (max 500)
+const CLANKER_CUT_PCT = 20;             // Clanker keeps a FIXED 20% of LP fees; recipients[] split the remaining 80% by bps
+const CLANKER_FEE_BPS = SWAP_FEE_BPS;   // back-compat alias (the old `20` mislabeled the 20% cut AS the swap fee — it's 100 bps)
+const SPLIT = { interface: 40, creator: 40, clanker: 20 }; // of TOTAL fees: creator 5000 + MomentMint 5000 bps (=50% of the 80% pool each) → 40/40, Clanker 20
 const isAddr = (a) => typeof a === 'string' && /^0x[a-fA-F0-9]{40}$/.test(a);
 const slug = (s) => String(s).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10) || 'MOMENT';
 const EXEC = 'FORBIDDEN — descriptor only; a HUMAN/relayer signs the Clanker deploy. No auto-deploy, no fund movement.';
@@ -39,10 +44,10 @@ function buildMomentCoin(moment, opts = {}) {
     momentRef: moment.ref || null,                  // cast hash / match-minute / drop id (bound as a memo)
     image: moment.image || null,
     liveWindow: { startSec: start, endSec: end },
-    fees: {                                         // who earns what share of Clanker's 0.20% swap fee
+    fees: {                                         // shares of LP fees from the 1% swap fee (Clanker keeps 20%, recipients split 80%)
       interfaceRecipient: opts.interfaceFeeRecipient, interfacePct: SPLIT.interface,
       creatorRecipient: opts.creator, creatorPct: SPLIT.creator,
-      clankerPct: SPLIT.clanker, feeBps: CLANKER_FEE_BPS,
+      clankerPct: SPLIT.clanker, feeBps: SWAP_FEE_BPS, clankerCutPct: CLANKER_CUT_PCT,
     },
   };
 }
@@ -50,26 +55,31 @@ function buildMomentCoin(moment, opts = {}) {
 /** The Clanker v4 deploy DESCRIPTOR (not executed) — grounded on the real SDK call.
  *  Clanker takes a fixed 20% of fees; the remaining 80% splits across rewards.recipients[] by bps (total 10000).
  *  To land interface 40% + creator 40% of TOTAL fees, each recipient gets 5000 bps (= 50% of the 80% pool). */
-function clankerDeployDescriptor(spec) {
+function clankerDeployDescriptor(spec, ctx = {}) {
   if (!spec || !spec.fees || !isAddr(spec.fees.interfaceRecipient)) throw new Error('invalid spec (build it with buildMomentCoin)');
+  if (!isAddr(spec.fees.creatorRecipient)) throw new Error('invalid spec.fees.creatorRecipient (the creator 0x address)');
   const recipients = [
-    { recipient: spec.fees.creatorRecipient, admin: spec.fees.creatorRecipient, bps: 5000, token: 'Both' }, // creator → 40% of total
-    { recipient: spec.fees.interfaceRecipient, admin: spec.fees.interfaceRecipient, bps: 5000, token: 'Both' }, // MomentMint, the partner-interface slot → 40% of total
+    { recipient: spec.fees.creatorRecipient, admin: spec.fees.creatorRecipient, bps: 5000, token: 'Both' }, // recipients[0] = creator → 40% of total
+    { recipient: spec.fees.interfaceRecipient, admin: spec.fees.interfaceRecipient, bps: 5000, token: 'Both' }, // recipients[1] = MomentMint interface slot → 40% of total
   ];
+  const bpsTotal = recipients.reduce((s, r) => s + r.bps, 0);
+  if (bpsTotal !== 10000) throw new Error('rewards.recipients bps must total 10000 (got ' + bpsTotal + ')');
   return {
     rail: 'clanker-v4',
-    sdkCall: 'deployWithTokenizedFees',             // PoolFans / Clanker v4 SDK (grounded via pool.fans/docs, 2026-06-30)
+    sdkCall: 'deploy',                              // clanker-sdk v4: new Clanker({publicClient,wallet}).deploy(params)
     params: {
-      name: spec.name, symbol: spec.ticker, image: spec.image,
+      name: spec.name, symbol: spec.ticker, image: spec.image || '',
       tokenAdmin: spec.fees.creatorRecipient,       // the creator owns/admins their moment coin
       rewards: { recipients },                       // bps split = the fee mechanism (our address = the interface slot)
+      fees: { type: 'static', clankerFee: spec.fees.feeBps, pairedFee: spec.fees.feeBps }, // GROUNDED: 100 bps = the 1% Clanker static default (max 500)
+      context: { interface: 'MomentMint', platform: ctx.platform || 'farcaster', messageId: spec.momentRef || ctx.messageId || '', id: ctx.id || '' }, // clanker.world provenance only — NOT fee routing
       memo: spec.momentRef,                          // bind the coin to its moment
     },
     feeSplit: { interfacePct: spec.fees.interfacePct, creatorPct: spec.fees.creatorPct, clankerPct: spec.fees.clankerPct, recipientsBps: '5000/5000 of the 80% post-Clanker pool', swapFeeBps: spec.fees.feeBps },
     chain: 'base',
     signed: false,
     execution: EXEC,
-    grounding: 'deployWithTokenizedFees(recipients[].bps) confirmed via pool.fans/docs 2026-06-30. P1: a human/relayer runs the SDK call; still confirm whether a separate interface-referrer bonus exists atop recipients[].',
+    grounding: 'clanker-sdk v4 deploy({rewards.recipients[].bps total 10000, fees.static 100bps=1%, context}) grounded on clanker.gitbook.io (creator-rewards-and-fees + sdk/v4.0.0), 2026-06-30. Clanker keeps 20% of LP fees; recipients split 80% → 5000 bps = 40% of total each. NO separate interface/referrer bonus: context.interface is clanker.world provenance only, so MomentMint revenue is SOLELY its recipients[] slot. P1: confirm exact accrual in a human-signed test deploy.',
   };
 }
 
@@ -89,7 +99,7 @@ function momentTimeBox(spec, nowSec) {
   };
 }
 
-module.exports = { buildMomentCoin, clankerDeployDescriptor, momentTimeBox, CLANKER_FEE_BPS, SPLIT };
+module.exports = { buildMomentCoin, clankerDeployDescriptor, momentTimeBox, CLANKER_FEE_BPS, SWAP_FEE_BPS, CLANKER_CUT_PCT, SPLIT };
 
 // ---- SELF-TEST (the checker) — no chain, no SDK -------------------------
 if (require.main === module) {
@@ -111,16 +121,17 @@ if (require.main === module) {
   const checks = [
     ['spec: ticker auto-derived + name kept', spec.ticker === 'MBAPPGOAL7' && spec.name === "Mbappé Goal 71'"],
     ['spec: live window + moment ref (memo) bound', spec.liveWindow.startSec === 1782000000 && spec.momentRef === 'wc:fra-bra:71'],
-    ['fee split is the partner-interface 40/40/20 of Clanker 0.20%', spec.fees.interfacePct === 40 && spec.fees.creatorPct === 40 && spec.fees.clankerPct === 20 && spec.fees.feeBps === 20],
-    ['descriptor uses the grounded Clanker v4 call + puts OUR address in recipients at 5000 bps (the 40% slot)', desc.rail === 'clanker-v4' && desc.sdkCall === 'deployWithTokenizedFees' && desc.params.rewards.recipients.some(r => r.recipient === PLATFORM && r.bps === 5000) && desc.feeSplit.interfacePct === 40],
-    ['descriptor is grounded on the real SDK (no fabricated call)', /deployWithTokenizedFees/.test(desc.sdkCall) && /pool\.fans/.test(desc.grounding)],
+    ['fee split is the partner-interface 40/40/20 on the 1% swap fee (100 bps, Clanker 20% cut)', spec.fees.interfacePct === 40 && spec.fees.creatorPct === 40 && spec.fees.clankerPct === 20 && spec.fees.feeBps === 100 && spec.fees.clankerCutPct === 20],
+    ['descriptor uses the grounded Clanker v4 deploy() + puts OUR address in recipients at 5000 bps (the 40% slot)', desc.rail === 'clanker-v4' && desc.sdkCall === 'deploy' && desc.params.rewards.recipients.some(r => r.recipient === PLATFORM && r.bps === 5000) && desc.feeSplit.interfacePct === 40],
+    ['descriptor carries the grounded fees (static 100bps=1%) + context (interface MomentMint, momentRef bound) from clanker.gitbook.io', desc.params.fees.type === 'static' && desc.params.fees.clankerFee === 100 && desc.params.fees.pairedFee === 100 && desc.params.context.interface === 'MomentMint' && desc.params.context.messageId === 'wc:fra-bra:71' && /clanker\.gitbook\.io/.test(desc.grounding)],
+    ['descriptor enforces rewards.recipients bps total = 10000', desc.params.rewards.recipients.reduce((s, r) => s + r.bps, 0) === 10000],
     ['DESCRIPTOR-ONLY: signed:false + execution FORBIDDEN', desc.signed === false && /FORBIDDEN/.test(desc.execution)],
     ['time-box live mid-window → featured + boostable', live.status === 'live' && live.featured === true && live.boostable === true],
     ['time-box after end → closed, NOT featured, NOT boostable (app-level honesty)', closed.status === 'closed' && closed.featured === false && closed.boostable === false],
     ['time-box before start → upcoming', upcoming.status === 'upcoming' && upcoming.live === false],
     ['honesty: closed label says coin still trades + never claims "frozen/safe"', /still trades/.test(closed.label) && /never claim/.test(closed.note)],
     ['input validation: no title / bad creator / zero-len window all throw', threwNoTitle && threwBadCreator && threwBadWindow],
-    ['NO executor in the module surface (only builders; descriptors are signed:false/FORBIDDEN)', !Object.keys(module.exports).some(k => /sign|send|swap|broadcast|submit|transfer|execute/i.test(k))],
+    ['NO executor in the module surface (only builders; descriptors are signed:false/FORBIDDEN)', !Object.keys(module.exports).some(k => typeof module.exports[k] === 'function' && /sign|send|swap|broadcast|submit|transfer|execute/i.test(k))],
   ];
 
   console.log('spec:', JSON.stringify({ name: spec.name, ticker: spec.ticker, fee: `${spec.fees.interfacePct}/${spec.fees.creatorPct}/${spec.fees.clankerPct} of ${spec.fees.feeBps}bps`, window: spec.liveWindow }));
