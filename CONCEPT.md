@@ -1,4 +1,4 @@
-# MomentMint — coin the moment, in one tap (Base / Clanker)
+# XMoment — coin the moment, in one tap (Base / Clanker)
 
 ## What it is
 One tap turns a live moment — a World Cup goal, a viral cast, a creator drop — into a tradeable **moment coin**

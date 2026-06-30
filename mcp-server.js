@@ -1,8 +1,8 @@
 'use strict';
 /**
- * MomentMint — mcp-server.js  (READ-ONLY / DESCRIPTOR-ONLY MCP tools)
+ * XMoment — mcp-server.js  (READ-ONLY / DESCRIPTOR-ONLY MCP tools)
  * ==================================================================
- * Exposes MomentMint as agent tools so the fleet (and any MCP client) can BUILD and DISTRIBUTE it:
+ * Exposes XMoment as agent tools so the fleet (and any MCP client) can BUILD and DISTRIBUTE it:
  *   - mint_moment    → Clanker deploy DESCRIPTOR for a moment-coin (a human signs)
  *   - mint_tweet     → tokenize a tweet on X → deploy descriptor (a human signs)
  *   - boost_quote    → x402 paywall config for a mint/boost tier (read-only config)
@@ -17,9 +17,10 @@
 const { buildMomentCoin, clankerDeployDescriptor, momentTimeBox } = require('./moment-coin');
 const { tweetMoment } = require('./tweet-moment');
 const { boostPaywall } = require('./boost-paywall');
+const { xMomentAction, runOnce } = require('./x-agent');
 
 const PROTOCOL = '2024-11-05';
-const SERVER = { name: 'momentmint', version: '0.1.0' };
+const SERVER = { name: 'xmoment', version: '0.1.0' };
 
 const TOOLS = [
   { name: 'mint_moment', description: 'DESCRIPTOR-ONLY: build a Clanker v4 deploy descriptor for a moment-coin (a human signs; nothing is deployed). Input: title, kind, startSec, endSec, creator, interfaceFeeRecipient, ticker?, image?, ref?.', inputSchema: { type: 'object', properties: { title: { type: 'string' }, kind: { type: 'string' }, startSec: { type: 'integer' }, endSec: { type: 'integer' }, creator: { type: 'string' }, interfaceFeeRecipient: { type: 'string' }, ticker: { type: 'string' }, image: { type: 'string' }, ref: { type: 'string' } }, required: ['title', 'startSec', 'endSec', 'creator', 'interfaceFeeRecipient'] } },
@@ -27,6 +28,7 @@ const TOOLS = [
   { name: 'boost_quote', description: 'READ-ONLY: x402 paywall config for a tier (free|mint|boost). Input: tier, payTo (for paid), usdOverride?.', inputSchema: { type: 'object', properties: { tier: { type: 'string' }, payTo: { type: 'string' }, usdOverride: { type: 'number' } } } },
   { name: 'moment_timebox', description: 'READ-ONLY: app-level live/featured/closed state of a moment-coin spec. Input: spec, nowSec?.', inputSchema: { type: 'object', properties: { spec: { type: 'object' }, nowSec: { type: 'integer' } }, required: ['spec'] } },
   { name: 'trending', description: 'READ-ONLY: the current trending moment-coins feed.', inputSchema: { type: 'object', properties: { limit: { type: 'integer' } }, additionalProperties: false } },
+  { name: 'x_moment', description: 'AUTONOMOUS DRAFT (publish-GATED, never auto-posts): turn a viral tweet (or candidates[]) into an XMoment coin + a reply DRAFT that redirects to the coin (/m/x:id). A human approves + posts. Input: tweet {id|url,text,authorHandle?,likes?,retweets?,replies?} OR candidates[]; trend?(football|breaking), creator, interfaceFeeRecipient, appUrl?, ticker?, limit?, minScore?.', inputSchema: { type: 'object', properties: { tweet: { type: 'object' }, candidates: { type: 'array' }, trend: { type: 'string' }, creator: { type: 'string' }, interfaceFeeRecipient: { type: 'string' }, appUrl: { type: 'string' }, ticker: { type: 'string' }, limit: { type: 'integer' }, minScore: { type: 'number' } } } },
 ];
 
 async function dispatch(msg, deps = {}) {
@@ -56,6 +58,9 @@ async function dispatch(msg, deps = {}) {
           payload = momentTimeBox(a.spec, a.nowSec);
         } else if (name === 'trending') {
           payload = { feed: store.list(a.limit || 20) };
+        } else if (name === 'x_moment') {
+          const opts = { appUrl: a.appUrl, creator: a.creator, interfaceFeeRecipient: a.interfaceFeeRecipient, ticker: a.ticker, trend: a.trend, limit: a.limit, minScore: a.minScore, channel: a.channel };
+          payload = Array.isArray(a.candidates) ? { queue: runOnce(a.candidates, opts) } : { action: xMomentAction(a.tweet || {}, opts) };
         } else return err(-32602, `unknown tool: ${name}`);
         return ok({ content: [{ type: 'text', text: typeof payload === 'string' ? payload : JSON.stringify(payload) }], isError: false });
       } catch (e) { return ok({ content: [{ type: 'text', text: `tool error: ${e.message}` }], isError: true }); }
@@ -68,7 +73,7 @@ module.exports = { dispatch, TOOLS, PROTOCOL, SERVER };
 
 // ---- SELF-TEST (the checker) ---------------------------------------------
 if (require.main === module) {
-  if (!process.argv.includes('--selftest')) { console.log('momentmint MCP — run with --selftest (HTTP transport TBD)'); return; }
+  if (!process.argv.includes('--selftest')) { console.log('xmoment MCP — run with --selftest (HTTP transport TBD)'); return; }
   (async () => {
     const CREATOR = '0x' + 'ab'.repeat(20), PLATFORM = '0x' + 'cd'.repeat(20);
     const store = { list: () => [{ ticker: 'GOAL71', ref: 'wc:fra-bra:71', volumeUsd: 1200 }, { ticker: 'TRADEEARN', ref: 'x:2069', volumeUsd: 800 }] };
@@ -79,10 +84,12 @@ if (require.main === module) {
     const boost = await dispatch({ id: 4, method: 'tools/call', params: { name: 'boost_quote', arguments: { tier: 'boost', payTo: PLATFORM } } });
     const trend = await dispatch({ id: 5, method: 'tools/call', params: { name: 'trending', arguments: {} } }, { store });
     const bad = await dispatch({ id: 6, method: 'tools/call', params: { name: 'execute_trade' } });
-    const momP = JSON.parse(mom.result.content[0].text), twtP = JSON.parse(twt.result.content[0].text), boostP = JSON.parse(boost.result.content[0].text), trendP = JSON.parse(trend.result.content[0].text);
+    const xm = await dispatch({ id: 7, method: 'tools/call', params: { name: 'x_moment', arguments: { tweet: { id: '111', text: 'GOAL Mbappe golazo in the world cup', authorHandle: 'FabrizioRomano', likes: 50000, retweets: 10000 }, creator: CREATOR, interfaceFeeRecipient: PLATFORM } } });
+    const momP = JSON.parse(mom.result.content[0].text), twtP = JSON.parse(twt.result.content[0].text), boostP = JSON.parse(boost.result.content[0].text), trendP = JSON.parse(trend.result.content[0].text), xmP = JSON.parse(xm.result.content[0].text);
 
     const checks = [
-      ['exposes the 5 MomentMint tools', list.result.tools.length === 5 && list.result.tools.map(t => t.name).sort().join() === 'boost_quote,mint_moment,mint_tweet,moment_timebox,trending'],
+      ['exposes the 6 XMoment tools', list.result.tools.length === 6 && list.result.tools.map(t => t.name).sort().join() === 'boost_quote,mint_moment,mint_tweet,moment_timebox,trending,x_moment'],
+      ['x_moment → autonomous coin + reply DRAFT: descriptor-only + publish GATED (never auto-posts)', xmP.action.descriptor.signed === false && xmP.action.publish.autoPosted === false && xmP.action.reply.includes(xmP.action.link)],
       ['mint_moment → a Clanker descriptor, signed:false (descriptor-only)', momP.descriptor.rail === 'clanker-v4' && momP.descriptor.signed === false],
       ['mint_tweet → a tweet-coin descriptor (kind tweet, signed:false)', twtP.spec.kind === 'tweet' && twtP.descriptor.signed === false],
       ['boost_quote → x402 config ($1.50 boost)', boostP.x402.amountMicroUnits === 1500000 && boostP.x402.payTo === PLATFORM],

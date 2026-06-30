@@ -1,9 +1,9 @@
 'use strict';
 /**
- * MomentMint — frame.js  (Farcaster Mini App embed: every coin is a shareable Frame)
+ * XMoment — frame.js  (Farcaster Mini App embed: every coin is a shareable Frame)
  * =================================================================================
  * The self-propagating distribution loop: when a coin's share page is posted in a Farcaster feed it
- * renders as a Mini App embed with a "Buy $TICKER" button that launches the MomentMint mini-app.
+ * renders as a Mini App embed with a "Buy $TICKER" button that launches the XMoment mini-app.
  *
  * Grounded on miniapps.farcaster.xyz/docs/specification (2026): a serialized MiniAppEmbed in the
  * `fc:miniapp` <meta> (the `fc:frame` meta is kept too, for legacy backward-compat). Embed fields:
@@ -22,7 +22,7 @@ function miniAppEmbed(coin, { appUrl, ogUrl }) {
     imageUrl: ogUrl,
     button: {
       title: `Buy $${coin.tk}`,
-      action: { type: 'launch_miniapp', name: 'MomentMint', url: appUrl, splashImageUrl: ogUrl, splashBackgroundColor: SPLASH_BG },
+      action: { type: 'launch_miniapp', name: 'XMoment', url: appUrl, splashImageUrl: ogUrl, splashBackgroundColor: SPLASH_BG },
     },
   };
 }
@@ -30,7 +30,7 @@ function miniAppEmbed(coin, { appUrl, ogUrl }) {
 /** the full share page for a coin (Mini App embed in Farcaster; a human page in a browser) */
 function coinSharePage(coin, opts) {
   const j = escAttr(JSON.stringify(miniAppEmbed(coin, opts)));
-  const title = `$${coin.tk} — ${coin.nm} · MomentMint`;
+  const title = `$${coin.tk} — ${coin.nm} · XMoment`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>${escHtml(title)}</title>
@@ -41,7 +41,7 @@ function coinSharePage(coin, opts) {
 <meta name="twitter:card" content="summary_large_image" />
 <style>body{font-family:system-ui,sans-serif;background:#FFF3DE;color:#2A1A05;display:grid;place-items:center;min-height:100vh;margin:0}.c{text-align:center;padding:28px}.t{font-size:38px;font-weight:800;letter-spacing:-.02em}.k{font-family:ui-monospace,monospace;color:#EB5E00;font-weight:700;margin:8px 0 20px}a{display:inline-block;background:linear-gradient(135deg,#FFD23D,#FF6A00);color:#3a1c00;font-weight:800;text-decoration:none;padding:14px 26px;border-radius:14px}.d{color:#7A6336;font-size:13px;max-width:32ch;margin:20px auto 0;line-height:1.5}</style>
 </head><body><div class="c"><div class="t">${escHtml(coin.nm)}</div><div class="k">$${escHtml(coin.tk)} · on Base</div>
-<a href="${escAttr(opts.appUrl)}">Open in MomentMint ☀</a>
+<a href="${escAttr(opts.appUrl)}">Open in XMoment ☀</a>
 <p class="d">a moment coin — speculative & time-boxed, not investment advice, never "verified".</p></div></body></html>`;
 }
 
@@ -58,12 +58,12 @@ function coinOgSvg(coin) {
 <text x="158" y="116" font-family="system-ui,sans-serif" font-weight="800" font-size="38" fill="#2A1A05">${nm}</text>
 <text x="158" y="156" font-family="ui-monospace,monospace" font-weight="700" font-size="22" fill="#EB5E00">$${tk}</text>
 <text x="52" y="300" font-family="system-ui,sans-serif" font-weight="800" font-size="32" fill="#2A1A05">Coin the moment.</text>
-<text x="52" y="338" font-family="ui-monospace,monospace" font-size="16" fill="#7A6336">on Base · creator earns 40% · MomentMint</text>
+<text x="52" y="338" font-family="ui-monospace,monospace" font-size="16" fill="#7A6336">on Base · creator earns 40% · XMoment</text>
 </svg>`;
 }
 
-/** 1024x1024 app icon: a summery sun with a rising price-tick (coin the moment + momentum). FONT-FREE (pure
- *  shapes) so it rasterizes cleanly to PNG. The solid cream bg satisfies the Farcaster "1024² PNG, no alpha" rule. */
+/** 1024x1024 app icon: the XMoment mark — a bold X in a summery sun ($XMT). FONT-FREE (pure shapes) so it
+ *  rasterizes cleanly to PNG. The solid cream bg satisfies the Farcaster "1024² PNG, no alpha" rule. */
 function appIconSvg() {
   const rays = [0, 45, 90, 135, 180, 225, 270, 315]
     .map((d) => `<line x1="512" y1="118" x2="512" y2="224" transform="rotate(${d} 512 512)"/>`).join('');
@@ -72,12 +72,11 @@ function appIconSvg() {
 <rect width="1024" height="1024" fill="#FFF3DE"/>
 <g stroke="#FFB81C" stroke-width="44" stroke-linecap="round">${rays}</g>
 <circle cx="512" cy="512" r="272" fill="url(#s)"/>
-<path d="M372 566 L486 452 L556 522 L648 408" fill="none" stroke="#FFF7E6" stroke-width="46" stroke-linecap="round" stroke-linejoin="round"/>
-<circle cx="648" cy="408" r="30" fill="#FFF7E6"/>
+<g stroke="#FFF7E6" stroke-width="64" stroke-linecap="round"><line x1="412" y1="412" x2="612" y2="612"/><line x1="612" y1="412" x2="412" y2="612"/></g>
 </svg>`;
 }
 
-/** 1200x630 hero / OG card: sun mark + wordmark + tagline (summery DA). Served at /hero.svg. */
+/** 1200x630 hero / OG card: the X-in-sun mark + XMoment wordmark + $XMT ticker + tagline (summery DA). */
 function appOgSvg() {
   const rays = [0, 45, 90, 135, 180, 225, 270, 315]
     .map((d) => `<line x1="250" y1="132" x2="250" y2="184" transform="rotate(${d} 250 315)"/>`).join('');
@@ -87,10 +86,10 @@ function appOgSvg() {
 <rect width="1200" height="14" fill="url(#g)"/>
 <g stroke="#FFB81C" stroke-width="20" stroke-linecap="round">${rays}</g>
 <circle cx="250" cy="315" r="122" fill="url(#g)"/>
-<path d="M188 352 L240 300 L272 332 L322 268" fill="none" stroke="#FFF7E6" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="430" y="298" font-family="system-ui,Segoe UI,sans-serif" font-weight="800" font-size="94" fill="#2A1A05">MomentMint</text>
-<text x="434" y="368" font-family="ui-monospace,monospace" font-size="34" fill="#EB5E00">coin the moment in one tap · on Base</text>
-<text x="434" y="430" font-family="system-ui,sans-serif" font-size="29" fill="#7A6336">a tweet, a goal, a cast becomes a tradeable coin. creator earns 40%.</text>
+<g stroke="#FFF7E6" stroke-width="30" stroke-linecap="round"><line x1="205" y1="270" x2="295" y2="360"/><line x1="295" y1="270" x2="205" y2="360"/></g>
+<text x="430" y="300" font-family="system-ui,Segoe UI,sans-serif" font-weight="800" font-size="98" fill="#2A1A05">XMoment</text>
+<text x="434" y="364" font-family="ui-monospace,monospace" font-weight="700" font-size="32" fill="#EB5E00">$XMT · coin the moment on Base</text>
+<text x="434" y="426" font-family="system-ui,sans-serif" font-size="29" fill="#7A6336">turn a viral tweet into a tradeable coin. creator earns 40%.</text>
 </svg>`;
 }
 
@@ -107,7 +106,7 @@ function farcasterManifest(opts = {}) {
     accountAssociation: opts.accountAssociation || { header: '', payload: '', signature: '' }, // ← operator signs `domain`; empty = pending
     miniapp: {
       version: '1',
-      name: 'MomentMint',                                       // <=32
+      name: 'XMoment',                                       // <=32
       homeUrl: appUrl,                                          // <=1024
       iconUrl: icon,                                            // 1024x1024 PNG (no alpha)
       splashImageUrl: splash,                                  // 200x200
@@ -117,7 +116,7 @@ function farcasterManifest(opts = {}) {
       primaryCategory: 'finance',                              // grounded enum
       tags: ['base', 'clanker', 'memecoin', 'trade', 'moments'], // <=5, <=20 each
       tagline: 'Coin the moment in one tap',                   // <=30
-      ogTitle: 'MomentMint',                                   // <=30
+      ogTitle: 'XMoment',                                   // <=30
       ogDescription: 'Coin a moment, a tweet or a cast on Base.', // <=100
       ogImageUrl: og,                                          // 1200x630 PNG
       heroImageUrl: opts.heroImageUrl || og,                   // 1200x630
@@ -144,7 +143,7 @@ if (require.main === module) {
     ['embed: button is a clear CTA ("Buy $TICKER")', embed.button.title === 'Buy $MBAPPE71'],
     ['embed: launch url + splash set', embed.button.action.url === opts.appUrl && embed.button.action.splashBackgroundColor === SPLASH_BG],
     ['share page carries fc:miniapp meta (+ fc:frame legacy) with the embed JSON', /name="fc:miniapp"/.test(page) && /name="fc:frame"/.test(page) && /launch_miniapp/.test(page)],
-    ['share page has og:image + a human "Open in MomentMint" link + honest disclaimer', /og:image/.test(page) && /Open in MomentMint/.test(page) && /never "verified"/.test(page)],
+    ['share page has og:image + a human "Open in XMoment" link + honest disclaimer', /og:image/.test(page) && /Open in XMoment/.test(page) && /never "verified"/.test(page)],
     ['OG svg is 3:2 (600x400) + shows the ticker + summery sun gradient', /width="600" height="400"/.test(svg) && /\$MBAPPE71/.test(svg) && /linearGradient/.test(svg)],
     ['attributes escaped (no raw quote-break in the embed meta)', !/content='[^']*'[^>]*'/.test(page.split('fc:miniapp')[1].slice(0, 400))],
     ['manifest: accountAssociation + miniapp v1, name<=32, Base chain, finance category (grounded farcaster.json)', (() => { const m = farcasterManifest({ appUrl: 'https://x.app' }); return !!m.accountAssociation && m.miniapp.version === '1' && m.miniapp.name.length <= 32 && m.miniapp.requiredChains.includes('eip155:8453') && m.miniapp.primaryCategory === 'finance'; })()],

@@ -1,5 +1,5 @@
 'use strict';
-// Minimal zero-dep static server for the MomentMint mini-app (public/). `node serve.js` → :4505
+// Minimal zero-dep static server for the XMoment mini-app (public/). `node serve.js` → :4505
 const http = require('http'), fs = require('fs'), path = require('path');
 const root = path.join(__dirname, 'public'), port = process.env.PORT || 4505;
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png' };

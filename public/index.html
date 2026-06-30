@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-<title>MomentMint — coin the moment</title>
+<title>XMoment — coin the moment</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
@@ -160,7 +160,7 @@
 <body>
 <div class="app">
   <div class="top">
-    <div class="logo"><span class="sun"></span><b>Moment<i>Mint</i></b></div>
+    <div class="logo"><span class="sun"></span><b><i>X</i>Moment</b></div>
     <div class="wal" onclick="connectWallet().then(ok=>toast('●',ok?'Wallet connected on Base':'No wallet found — install Coinbase Wallet or MetaMask')).catch(()=>{})" style="cursor:pointer" title="Connect your wallet"><span class="av"></span> demo <span class="bal">not connected</span></div>
   </div>
   <div class="scroll">
@@ -232,7 +232,7 @@ document.getElementById('tabs').addEventListener('click',e=>{const t=e.target.cl
   document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.dataset.pane===t.dataset.pane));});
 
 let cur=null, tier='mint', timers=[], wallet=null, walletProvider=null, fcSdk=null, curRef=null, walletReady=null, curMinted=null; const tierPx={free:'$0',mint:'$0.49',boost:'$1.50'};
-const PLATFORM_ADDR='0xAC3ca7c5d3cDD7702fd08F9C4C28dAA22296aDa9'; // MomentMint fee recipient = MainStreet operator addr
+const PLATFORM_ADDR='0xAC3ca7c5d3cDD7702fd08F9C4C28dAA22296aDa9'; // XMoment fee recipient = MainStreet operator addr
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); // escape ANY value before innerHTML (XSS-safe)
 // Farcaster Mini App wallet — connects in a Farcaster client; stays null (demo) in a plain browser.
 // walletReady resolves once the connect attempt settles, so coinIt can `await` it before minting (no race).
@@ -337,7 +337,7 @@ async function coinIt(){ if(!cur)return;
   if(!descriptor){ toast('●','Backend unreachable — try again in a moment'); return stop(); }
   toast('●','Connecting your wallet…');
   let haveWallet=false; try{ haveWallet=await connectWallet(); }catch(e){ console.error('[momentmint connect]', e); }
-  if(!haveWallet){ toast('●','No wallet found — install Coinbase Wallet or MetaMask, or open MomentMint in a Farcaster app'); return stop(); }
+  if(!haveWallet){ toast('●','No wallet found — install Coinbase Wallet or MetaMask, or open XMoment in a Farcaster app'); return stop(); }
   toast('●','Minting $'+cur.tk+' — confirm in your wallet…');   // the USER signs the real Clanker deploy on Base
   try{ mintedAddr=await mintOnChain(descriptor); }
   catch(e){ console.error('[momentmint mint]', e); toast('●','Mint failed — '+String(e&&e.message||e).slice(0,70)); return stop(); }
@@ -356,7 +356,7 @@ async function coinIt(){ if(!cur)return;
   document.querySelectorAll('.chip').forEach(x=>x.classList.remove('sel'));}
 async function shareCoin(){ if(!cur)return;
   const url=location.origin+'/m/'+encodeURIComponent(curRef||('m:'+cur.tk));
-  const text='I coined $'+cur.tk+' — '+cur.nm+' on MomentMint ☀ grab it before the moment closes';
+  const text='I coined $'+cur.tk+' — '+cur.nm+' on XMoment ☀ grab it before the moment closes';
   if(fcSdk&&fcSdk.actions&&fcSdk.actions.composeCast){ try{ await fcSdk.actions.composeCast({text, embeds:[url]}); toast('●','Shared to Farcaster — you earn on every trade'); return; }catch(e){} }
   try{ await navigator.clipboard.writeText(url); }catch(e){}
   try{ window.open('https://x.com/intent/tweet?text='+encodeURIComponent(text)+'&url='+encodeURIComponent(url),'_blank'); }catch(e){}

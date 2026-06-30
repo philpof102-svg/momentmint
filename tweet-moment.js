@@ -1,6 +1,6 @@
 'use strict';
 /**
- * MomentMint — tweet-moment.js  (tokenize a tweet on X → a moment-coin)
+ * XMoment — tweet-moment.js  (tokenize a tweet on X → a moment-coin)
  * ====================================================================
  * Phil 2026-06-30: "le momentcoin peut être des tweet aussi → on peut tokeniser les tweets sur X."
  * A tweet IS a moment. This turns an X (Twitter) post into a moment, then reuses moment-coin.js to build

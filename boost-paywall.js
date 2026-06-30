@@ -1,6 +1,6 @@
 'use strict';
 /**
- * MomentMint — boost-paywall.js  (the flat USDC fee at tap-time)
+ * XMoment — boost-paywall.js  (the flat USDC fee at tap-time)
  * =============================================================
  * The second revenue line (besides the 40% Clanker fee cut): a flat USDC fee a creator pays the instant
  * they tap "Coin this moment", collected via x402 (paywallMiddlewareV2 + CDP facilitator) BEFORE the
@@ -22,14 +22,14 @@ const TIERS = {
 
 /** Build the x402 paywall descriptor for a tier.
  *  @param {'free'|'mint'|'boost'} tier
- *  @param {{payTo?:string, usdOverride?:number}} opts  payTo = MomentMint's USDC address (required for paid tiers) */
+ *  @param {{payTo?:string, usdOverride?:number}} opts  payTo = XMoment's USDC address (required for paid tiers) */
 function boostPaywall(tier, opts = {}) {
   const t = TIERS[tier];
   if (!t) throw new Error(`unknown tier '${tier}' (free|mint|boost)`);
   const usd = typeof opts.usdOverride === 'number' ? opts.usdOverride : t.usd;
   if (usd < 0) throw new Error('amount cannot be negative');
   const paid = usd > 0;
-  if (paid && !isAddr(opts.payTo)) throw new Error('opts.payTo (MomentMint USDC address) required for paid tiers');
+  if (paid && !isAddr(opts.payTo)) throw new Error('opts.payTo (XMoment USDC address) required for paid tiers');
   return {
     tier,
     free: !paid,

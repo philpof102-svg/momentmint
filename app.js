@@ -1,6 +1,6 @@
 'use strict';
 /**
- * MomentMint — app.js  (the deployable server: UI + descriptor APIs + MCP + health)
+ * XMoment — app.js  (the deployable server: UI + descriptor APIs + MCP + health)
  * ================================================================================
  * One zero-dep node server that:
  *   - serves the mini-app UI (public/)
@@ -22,6 +22,7 @@ const { boostPaywall } = require('./boost-paywall');
 const { dispatch, SERVER } = require('./mcp-server');
 const { createStore } = require('./store');
 const { coinSharePage, coinOgSvg, farcasterManifest, appIconSvg } = require('./frame');
+const { xMomentAction, runOnce } = require('./x-agent');
 
 const ROOT = path.join(__dirname, 'public');
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon' };
@@ -43,7 +44,7 @@ function coinByRef(ref) {
 }
 const appBase = (req) => (req.headers['x-forwarded-proto'] || 'https') + '://' + (req.headers.host || 'momentmint-production.up.railway.app');
 
-// MomentMint's fee recipient = the MainStreet operator ADDRESS (Phil 2026-06-30 "use the same key as MainStreet").
+// XMoment's fee recipient = the MainStreet operator ADDRESS (Phil 2026-06-30 "use the same key as MainStreet").
 // PUBLIC address only — used as the 40% Clanker interface slot + the x402 Boost payTo. The server NEVER holds
 // or uses a private key; the CREATOR signs their own mint with their wallet (descriptor-only, one tap).
 const PLATFORM = process.env.MOMENTMINT_FEE_RECIPIENT || '0xAC3ca7c5d3cDD7702fd08F9C4C28dAA22296aDa9';
@@ -74,6 +75,14 @@ function createServer() {
       if (req.method === 'POST' && url === '/api/boost') {
         const a = await body(req) || {};
         return json(res, 200, boostPaywall(a.tier || 'mint', { payTo: a.payTo || PLATFORM, usdOverride: a.usdOverride }));
+      }
+      // autonomous trend→coin→reply DRAFT (publish-GATED; a human posts). tweet → one action, candidates[] → a queue.
+      if (req.method === 'POST' && url === '/api/x-moment') {
+        const a = await body(req) || {};
+        const opts = { appUrl: appBase(req), creator: a.creator || PLATFORM, interfaceFeeRecipient: a.interfaceFeeRecipient || PLATFORM, ticker: a.ticker, trend: a.trend, limit: a.limit, minScore: a.minScore, channel: a.channel };
+        if (Array.isArray(a.candidates)) return json(res, 200, { queue: runOnce(a.candidates, opts) });
+        if (a.tweet) return json(res, 200, { action: xMomentAction(a.tweet, opts) });
+        return json(res, 400, { error: 'tweet or candidates[] required' });
       }
       if (req.method === 'GET' && url === '/api/trending') return json(res, 200, { feed: store.list() });
       if (req.method === 'POST' && url === '/api/record') {
@@ -124,7 +133,7 @@ module.exports = { createServer };
 
 if (require.main === module) {
   if (!process.argv.includes('--selftest')) {
-    createServer().listen(process.env.PORT || 4505, () => console.log('MomentMint live on :' + (process.env.PORT || 4505) + ' (UI + /api/* descriptors + /mcp + /health)'));
+    createServer().listen(process.env.PORT || 4505, () => console.log('XMoment live on :' + (process.env.PORT || 4505) + ' (UI + /api/* descriptors + /mcp + /health)'));
   } else {
     const srv = createServer();
     srv.listen(0, async () => {
@@ -144,22 +153,24 @@ if (require.main === module) {
       const og = await get('/og/wc:fra:71.svg');
       const manifest = await get('/.well-known/farcaster.json');
       const icon = await get('/icon.svg');
+      const xmom = await post('/api/x-moment', { tweet: { id: '111', text: 'GOAL Mbappe golazo world cup', authorHandle: 'FabrizioRomano', likes: 50000, retweets: 10000 } });
 
       const checks = [
         ['GET /health → ok + descriptorOnly', health.status === 200 && JSON.parse(health.body).descriptorOnly === true],
-        ['GET / → serves the mini-app UI', ui.status === 200 && /Coin the/.test(ui.body) && /MomentMint/.test(ui.body)],
+        ['GET / → serves the mini-app UI', ui.status === 200 && /Coin the/.test(ui.body) && /XMoment/.test(ui.body)],
         ['POST /api/mint-moment → Clanker descriptor, signed:false', mom.status === 200 && mom.body.descriptor.rail === 'clanker-v4' && mom.body.descriptor.signed === false],
         ['POST /api/mint-tweet → tweet-coin descriptor (kind tweet)', twt.status === 200 && twt.body.spec.kind === 'tweet' && twt.body.descriptor.signed === false],
         ['POST /api/boost → x402 config ($1.50)', boost.status === 200 && boost.body.x402.amountMicroUnits === 1500000],
-        ['POST /mcp tools/list → 5 tools (streamable-http)', list.status === 200 && list.body.result.tools.length === 5],
+        ['POST /mcp tools/list → 6 tools (streamable-http)', list.status === 200 && list.body.result.tools.length === 6],
         ['POST /api/record → ok (confirmed-mint flow)', rec.status === 200 && rec.body.ok === true],
         ['GET /api/trending → store feed incl. the just-recorded coin', trend.status === 200 && JSON.parse(trend.body).feed.some(c => c.ref === 'test:1')],
         ['GET /m/:ref → Farcaster Mini App embed share page (fc:miniapp + launch_miniapp)', frame.status === 200 && /fc:miniapp/.test(frame.body) && /launch_miniapp/.test(frame.body)],
         ['GET /og/:ref.svg → 3:2 coin OG image', og.status === 200 && /<svg/.test(og.body) && /width="600" height="400"/.test(og.body)],
         ['GET /.well-known/farcaster.json → installable manifest (miniapp v1, Base chain, accountAssociation pending signature)', manifest.status === 200 && (() => { const m = JSON.parse(manifest.body); return m.miniapp.version === '1' && m.miniapp.requiredChains.includes('eip155:8453') && m.accountAssociation.signature === ''; })()],
         ['GET /icon.svg → 1024x1024 app icon', icon.status === 200 && /width="1024" height="1024"/.test(icon.body)],
+        ['POST /api/x-moment → autonomous coin + reply DRAFT (descriptor-only, publish-gated)', xmom.status === 200 && xmom.body.action.descriptor.signed === false && xmom.body.action.publish.autoPosted === false],
       ];
-      console.log('MomentMint server self-test:');
+      console.log('XMoment server self-test:');
       let pass = 0; for (const [n, ok] of checks) { console.log(ok ? 'PASS' : 'FAIL', '·', n); if (ok) pass++; }
       console.log(`\n${pass}/${checks.length} checks passed`);
       srv.close(); process.exit(pass === checks.length ? 0 : 1);

@@ -1,11 +1,11 @@
 {
-  "name": "momentmint",
+  "name": "xmoment",
   "version": "0.1.0",
   "private": true,
-  "description": "Coin the moment in one tap — a Clanker partner interface on Base. Descriptor-only; a human signs.",
+  "description": "XMoment ($XMT) — turn a viral tweet or moment into a tradeable coin in one tap, a Clanker partner interface on Base. Descriptor-only; a human signs.",
   "scripts": {
     "start": "node app.js",
-    "test": "node moment-coin.js && node tweet-moment.js && node boost-paywall.js && node mcp-server.js --selftest && node app.js --selftest"
+    "test": "node moment-coin.js && node tweet-moment.js && node boost-paywall.js && node x-agent.js && node store.js && node frame.js && node mcp-server.js --selftest && node app.js --selftest"
   },
   "engines": { "node": ">=18" }
 }

@@ -1,4 +1,4 @@
-# ☀ MomentMint
+# ☀ XMoment
 
 **Coin the moment in one tap** — turn a moment, a tweet, or a Farcaster cast into a tradeable coin on **Base**,
 launched through **Clanker** as a partner interface.
@@ -11,22 +11,22 @@ launched through **Clanker** as a partner interface.
    disclaimer (the coin keeps trading on-chain after the moment closes; speculative, not advice).
 3. Tap **Coin it** → in a Farcaster client the **user signs** a real Clanker `deploy()` with their own wallet.
 
-The coin is **time-boxed**: MomentMint stops *featuring* it once the moment ends (an app-level honesty signal — Clanker
+The coin is **time-boxed**: XMoment stops *featuring* it once the moment ends (an app-level honesty signal — Clanker
 tokens have no on-chain pause, and we never claim one).
 
 ## Revenue (grounded on [clanker.gitbook.io](https://clanker.gitbook.io))
 Each trade pays a **1% swap fee** (100 bps, Clanker's static-pool default). Clanker keeps **20%** of the LP fees;
-reward recipients split the remaining **80%** by basis points (which must total 10000). MomentMint is a recipient at
+reward recipients split the remaining **80%** by basis points (which must total 10000). XMoment is a recipient at
 5000 bps and the creator at 5000 bps, so:
 
 | | share of total fees |
 |---|---|
 | **Creator** | **40%** |
-| **MomentMint** (the interface) | **40%** |
+| **XMoment** (the interface) | **40%** |
 | Clanker (protocol) | 20% |
 
 There is **no separate interface/referrer bonus** — `context.interface` is only clanker.world social provenance;
-MomentMint's revenue comes solely from its `recipients[]` slot. A second, optional line is a flat USDC **Boost** fee
+XMoment's revenue comes solely from its `recipients[]` slot. A second, optional line is a flat USDC **Boost** fee
 via **x402** (free / $0.49 mint / $1.50 boost).
 
 ## Safety model (descriptor-only)

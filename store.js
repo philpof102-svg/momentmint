@@ -1,9 +1,9 @@
 'use strict';
 /**
- * MomentMint — store.js  (zero-dep persistence for the moment→coin index + trending feed)
+ * XMoment — store.js  (zero-dep persistence for the moment→coin index + trending feed)
  * =======================================================================================
  * A tiny JSON-file-backed store (no native build, no experimental flags — reliable on Railby/railpack).
- * Holds coins created via MomentMint and serves a trending feed with live/closed status derived from each
+ * Holds coins created via XMoment and serves a trending feed with live/closed status derived from each
  * coin's moment end. better-sqlite3 / node:sqlite is the scale upgrade later; JSON is plenty for the MVP cache.
  *
  * NOTE: on Railway the data dir is ephemeral (resets on redeploy) — fine for a trending CACHE; attach a

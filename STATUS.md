@@ -1,4 +1,4 @@
-# MomentMint — STATUS (loop reads FIRST, writes LAST)
+# XMoment — STATUS (loop reads FIRST, writes LAST)
 
 Coin the moment in one tap, on Base via **Clanker**. See `CONCEPT.md`. NEW standalone repo, started 2026-06-30
 (ultracode workflow v2 winner; Phil: ethics **GO** "ship with honesty" + stack = **Clanker/Base**, not raw B20).
@@ -43,14 +43,14 @@ their own mint** (descriptor-only, one tap). Mint fee **$0.49**. **Named players
   innerHTML + server-side sanitize on `/api/record`); failed-mint UX honest (LIVE card gated on a real on-chain address,
   fabricated price/pool/Buy removed); walletReady race + honest "demo / not connected" header; CDN-import guard.
 - **FEE MODEL GROUNDED + corrected** (clanker.gitbook.io): swap fee = **1% (100 bps default, max 500)**, Clanker keeps
-  **20%** of LP fees, recipients split **80%** → MomentMint 5000 bps = **40% of total**, creator 40%. **NO separate
+  **20%** of LP fees, recipients split **80%** → XMoment 5000 bps = **40% of total**, creator 40%. **NO separate
   interface bonus** (context.interface = clanker.world provenance only). Backend descriptor owns fees+context; frontend consumes it.
 - **INSTALLABLE MANIFEST** — `/.well-known/farcaster.json` + `/icon.svg` (miniapp v1, Base eip155:8453, length-checked;
   `accountAssociation` env-driven + EMPTY until the operator signs — never fabricated).
 
 ## Remaining — Phil-side only (can't be done autonomously / can't verify without a funded wallet)
 1. **ONE human-signed on-chain test deploy** of a moment-coin on Base (funded Farcaster wallet) → confirm the token mints,
-   the pool is created, and the MomentMint address receives its 40% fee share at the grounded config. **The P1 gate.**
+   the pool is created, and the XMoment address receives its 40% fee share at the grounded config. **The P1 gate.**
 2. **Signed `accountAssociation`** for the domain → env `MOMENTMINT_FC_HEADER` / `PAYLOAD` / `SIGNATURE` (makes it installable).
 3. **Real PNG assets** (1024² icon no-alpha, 200² splash, 1200×630 og) → env `MOMENTMINT_ICON_URL` / `SPLASH_URL` / `OG_URL`.
 4. The **Buy** path (one-tap swap) — waits for a real minted pool to wire honestly (the fake stub was removed).
