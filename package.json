@@ -1,0 +1,11 @@
+{
+  "name": "momentmint",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Coin the moment in one tap — a Clanker partner interface on Base. Descriptor-only; a human signs.",
+  "scripts": {
+    "start": "node app.js",
+    "test": "node moment-coin.js && node tweet-moment.js && node boost-paywall.js && node mcp-server.js --selftest && node app.js --selftest"
+  },
+  "engines": { "node": ">=18" }
+}
