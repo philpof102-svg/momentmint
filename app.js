@@ -21,6 +21,7 @@ const { tweetMoment } = require('./tweet-moment');
 const { boostPaywall } = require('./boost-paywall');
 const { dispatch, SERVER } = require('./mcp-server');
 const { createStore } = require('./store');
+const { coinSharePage, coinOgSvg } = require('./frame');
 
 const ROOT = path.join(__dirname, 'public');
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon' };
@@ -35,6 +36,12 @@ const SEED = [
 ];
 const store = createStore(process.env.MOMENTMINT_DB);
 store.seed(SEED);
+
+// look up a coin by its moment ref, or synthesize a minimal one so ANY ref shares as a Frame
+function coinByRef(ref) {
+  return store.all().find((c) => c.ref === ref) || { nm: ref, tk: (String(ref).toUpperCase().replace(/[^A-Z0-9]/g, '') || 'COIN').slice(0, 9), em: '☀', ref };
+}
+const appBase = (req) => (req.headers['x-forwarded-proto'] || 'https') + '://' + (req.headers.host || 'momentmint-production.up.railway.app');
 
 const json = (res, code, obj, extra) => { res.writeHead(code, { 'content-type': 'application/json', ...(extra || {}) }); res.end(JSON.stringify(obj)); };
 const body = (req) => new Promise((r) => { let b = ''; req.on('data', (c) => { b += c; if (b.length > 1e6) req.destroy(); }); req.on('end', () => { try { r(b ? JSON.parse(b) : {}); } catch { r(null); } }); });
@@ -65,6 +72,17 @@ function createServer() {
       }
       if (req.method === 'GET' && url === '/api/trending') return json(res, 200, { feed: store.list() });
       if (req.method === 'POST' && url === '/api/record') { const a = await body(req) || {}; if (!a.tk || !a.ref) return json(res, 400, { error: 'tk + ref required' }); store.record(a); return json(res, 200, { ok: true, count: store.all().length }); }
+
+      // shareable Frame surface: every coin is a Farcaster Mini App embed (the self-propagating loop)
+      if (req.method === 'GET' && url.startsWith('/m/')) {
+        const ref = decodeURIComponent(url.slice(3)); const base = appBase(req);
+        const page = coinSharePage(coinByRef(ref), { appUrl: base + '/?m=' + encodeURIComponent(ref), ogUrl: base + '/og/' + encodeURIComponent(ref) + '.svg' });
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); return res.end(page);
+      }
+      if (req.method === 'GET' && url.startsWith('/og/') && url.endsWith('.svg')) {
+        const ref = decodeURIComponent(url.slice(4, -4));
+        res.writeHead(200, { 'content-type': 'image/svg+xml; charset=utf-8' }); return res.end(coinOgSvg(coinByRef(ref)));
+      }
 
       if (req.method === 'GET') {
         let p = decodeURIComponent(url); if (p === '/') p = '/index.html';
@@ -97,6 +115,8 @@ if (require.main === module) {
       const list = await post('/mcp', { jsonrpc: '2.0', id: 1, method: 'tools/list' });
       const rec = await post('/api/record', { nm: 'Test Coin', tk: 'TESTC', ref: 'test:1', em: '🧪' });
       const trend = await get('/api/trending');
+      const frame = await get('/m/wc:fra:71');
+      const og = await get('/og/wc:fra:71.svg');
 
       const checks = [
         ['GET /health → ok + descriptorOnly', health.status === 200 && JSON.parse(health.body).descriptorOnly === true],
@@ -107,6 +127,8 @@ if (require.main === module) {
         ['POST /mcp tools/list → 5 tools (streamable-http)', list.status === 200 && list.body.result.tools.length === 5],
         ['POST /api/record → ok (confirmed-mint flow)', rec.status === 200 && rec.body.ok === true],
         ['GET /api/trending → store feed incl. the just-recorded coin', trend.status === 200 && JSON.parse(trend.body).feed.some(c => c.ref === 'test:1')],
+        ['GET /m/:ref → Farcaster Mini App embed share page (fc:miniapp + launch_miniapp)', frame.status === 200 && /fc:miniapp/.test(frame.body) && /launch_miniapp/.test(frame.body)],
+        ['GET /og/:ref.svg → 3:2 coin OG image', og.status === 200 && /<svg/.test(og.body) && /width="600" height="400"/.test(og.body)],
       ];
       console.log('MomentMint server self-test:');
       let pass = 0; for (const [n, ok] of checks) { console.log(ok ? 'PASS' : 'FAIL', '·', n); if (ok) pass++; }

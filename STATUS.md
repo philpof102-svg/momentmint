@@ -55,6 +55,7 @@ _Last write: 2026-06-30 — 4 modules, 37/37: `moment-coin` (Clanker v4 deploy G
 mint_moment / mint_tweet / boost_quote / moment_timebox / trending). All descriptor-only. Stack = Clanker partner
 interface on Base. Ethics GO. **DEPLOYED LIVE** at momentmint-production.up.railway.app — `app.js` (8/8) serves UI +
 descriptor APIs + `/api/record` + `/mcp` + `/health`; `store.js` (7/7, zero-dep JSON persistence: moment→coin index +
-trending feed, de-duped, live/closed status); summery Kalshi/Polymarket UI (screenshotted); **52/52 across 6 suites**.
-Next: Farcaster Frame endpoints (in-feed mint, return descriptors), then real on-chain minting (needs Phil's relayer + gates).
+trending feed, de-duped, live/closed status); summery Kalshi/Polymarket UI (screenshotted) + `frame.js` (8/8,
+Farcaster **Mini App embed** — `/m/:ref` share page + `/og/:ref.svg`, every coin = a shareable Frame); **62/62 across 7 suites**.
+Next: real on-chain minting (needs Phil's relayer + gates) + wire the Frame share buttons into the UI.
 **Gates pending Phil for live minting: relayer key + gas · mint-fee level ($0.49 vs lower) · IP appetite (named vs generic).**_
