@@ -25,6 +25,10 @@ Coin the moment in one tap, on Base via **Clanker**. See `CONCEPT.md`. NEW stand
 - **`mcp-server.js`** (8/8) — READ-ONLY/descriptor-only MCP tools (`mint_moment` / `mint_tweet` / `boost_quote` /
   `moment_timebox` / `trending`) so the fleet + any MCP client can BUILD and DISTRIBUTE it. No tool signs/deploys/
   charges; `mint_*` return `signed:false` descriptors. Trending store INJECTED (no DB coupling). JSON-RPC 2.0.
+- **`public/index.html`** (UI, mobile-first mock + `serve.js`) — the "Coin the moment" mini-app: live-match
+  templates + tweet/cast paste → coin preview (live-window countdown + creator-earns-40% + honest disclaimer) →
+  "Coin it $0.49" → flips to a tradeable Buy card; trending feed incl. a CLOSED (greyed) coin. Stadium-ticker /
+  trader aesthetic, Base-blue, JS syntax-clean, self-contained. Honest — never "verified/safe". (frontend-design skill.)
 ### Next (P1)
 - ✅ **Clanker v4 deploy call GROUNDED** (pool.fans/docs): `deployWithTokenizedFees({name,symbol,image,tokenAdmin,
   rewards:{recipients:[{recipient,admin,bps,token}]}})`. Fee split = `recipients[].bps` (Clanker auto-takes 20%; 80%
@@ -44,5 +48,6 @@ relayer key holder + gas funding · flat mint-fee level ($0.49 vs lower) · IP a
 _Last write: 2026-06-30 — 4 modules, 37/37: `moment-coin` (Clanker v4 deploy GROUNDED) + `tweet-moment`
 (tokenize a tweet on X) + `boost-paywall` (x402 flat fee) + `mcp-server` (read-only/descriptor-only MCP tools:
 mint_moment / mint_tweet / boost_quote / moment_timebox / trending). All descriptor-only. Stack = Clanker partner
-interface on Base. Ethics GO. Next: better-sqlite3 trending store + the Frames v2 mini-app UI. Live test-deploy
-needs Phil's relayer key + the 4 gates (relayer/gas · mint-fee level · IP appetite · 14-day kill number)._
+interface on Base. Ethics GO. **UI mock shipped** (public/index.html, mobile-first, syntax-clean). Next: wire the
+real Clanker v4 deploy + the x402 boost server + the Farcaster Frame endpoints + a sqlite trending store. Live
+test-deploy needs Phil's relayer key + the 4 gates (relayer/gas · mint-fee level · IP appetite · 14-day kill number)._
