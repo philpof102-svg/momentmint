@@ -20,17 +20,21 @@ const { buildMomentCoin, clankerDeployDescriptor } = require('./moment-coin');
 const { tweetMoment } = require('./tweet-moment');
 const { boostPaywall } = require('./boost-paywall');
 const { dispatch, SERVER } = require('./mcp-server');
+const { createStore } = require('./store');
 
 const ROOT = path.join(__dirname, 'public');
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon' };
 
-// In-memory trending seed (a sqlite store is the P-next upgrade; the MCP `trending` tool reads this).
-const TRENDING = [
-  { nm: 'Messi Free Kick', tk: 'MESSIFK', em: '🐐', pr: '$0.041', ch: '+612%', up: true },
-  { nm: 'Built to Trade', tk: 'TRADEEARN', em: '🐦', pr: '$0.0019', ch: '+88%', up: true },
-  { nm: 'Keeper Howler', tk: 'HOWLER', em: '🧤', pr: '$0.0003', ch: '-44%', up: false },
-  { nm: 'Half-time Whistle', tk: 'HT45', em: '⏱️', pr: '$0.0011', ch: 'closed', up: false, closed: true },
+// Persistent trending feed (store.js — JSON-file, de-duped). Seeded once; /api/trending + the MCP
+// `trending` tool read the store. /api/record adds a coin (for the confirmed-mint flow, relayer-gated).
+const SEED = [
+  { nm: 'Messi Free Kick', tk: 'MESSIFK', em: '🐐', ref: 'seed:messifk', pr: '$0.041', ch: '+612%', up: true },
+  { nm: 'Built to Trade', tk: 'TRADEEARN', em: '🐦', ref: 'seed:tradeearn', pr: '$0.0019', ch: '+88%', up: true },
+  { nm: 'Keeper Howler', tk: 'HOWLER', em: '🧤', ref: 'seed:howler', pr: '$0.0003', ch: '-44%', up: false },
+  { nm: 'Half-time Whistle', tk: 'HT45', em: '⏱️', ref: 'seed:ht45', pr: '$0.0011', ch: 'closed', up: false, closed: true },
 ];
+const store = createStore(process.env.MOMENTMINT_DB);
+store.seed(SEED);
 
 const json = (res, code, obj, extra) => { res.writeHead(code, { 'content-type': 'application/json', ...(extra || {}) }); res.end(JSON.stringify(obj)); };
 const body = (req) => new Promise((r) => { let b = ''; req.on('data', (c) => { b += c; if (b.length > 1e6) req.destroy(); }); req.on('end', () => { try { r(b ? JSON.parse(b) : {}); } catch { r(null); } }); });
@@ -43,7 +47,7 @@ function createServer() {
 
       if (url === '/mcp') {
         if (req.method === 'GET') return json(res, 405, { error: 'POST JSON-RPC to /mcp' }, { allow: 'POST' });
-        if (req.method === 'POST') { const m = await body(req); if (m === null) return json(res, 400, { jsonrpc: '2.0', id: null, error: { code: -32700, message: 'parse error' } }); const r = await dispatch(m, { store: { list: () => TRENDING } }); if (r === null || r === undefined) { res.writeHead(202); return res.end(); } return json(res, 200, r); }
+        if (req.method === 'POST') { const m = await body(req); if (m === null) return json(res, 400, { jsonrpc: '2.0', id: null, error: { code: -32700, message: 'parse error' } }); const r = await dispatch(m, { store }); if (r === null || r === undefined) { res.writeHead(202); return res.end(); } return json(res, 200, r); }
       }
 
       if (req.method === 'POST' && url === '/api/mint-moment') {
@@ -59,7 +63,8 @@ function createServer() {
         const a = await body(req) || {};
         return json(res, 200, boostPaywall(a.tier || 'mint', { payTo: a.payTo, usdOverride: a.usdOverride }));
       }
-      if (req.method === 'GET' && url === '/api/trending') return json(res, 200, { feed: TRENDING });
+      if (req.method === 'GET' && url === '/api/trending') return json(res, 200, { feed: store.list() });
+      if (req.method === 'POST' && url === '/api/record') { const a = await body(req) || {}; if (!a.tk || !a.ref) return json(res, 400, { error: 'tk + ref required' }); store.record(a); return json(res, 200, { ok: true, count: store.all().length }); }
 
       if (req.method === 'GET') {
         let p = decodeURIComponent(url); if (p === '/') p = '/index.html';
@@ -90,6 +95,7 @@ if (require.main === module) {
       const twt = await post('/api/mint-tweet', { tweet: { url: 'https://x.com/jessepollak/status/2069212188619805179', text: 'Built to Trade & Earn', createdAtSec: 1782000000 }, creator: '0x' + 'ab'.repeat(20), interfaceFeeRecipient: '0x' + 'cd'.repeat(20) });
       const boost = await post('/api/boost', { tier: 'boost', payTo: '0x' + 'cd'.repeat(20) });
       const list = await post('/mcp', { jsonrpc: '2.0', id: 1, method: 'tools/list' });
+      const rec = await post('/api/record', { nm: 'Test Coin', tk: 'TESTC', ref: 'test:1', em: '🧪' });
       const trend = await get('/api/trending');
 
       const checks = [
@@ -99,7 +105,8 @@ if (require.main === module) {
         ['POST /api/mint-tweet → tweet-coin descriptor (kind tweet)', twt.status === 200 && twt.body.spec.kind === 'tweet' && twt.body.descriptor.signed === false],
         ['POST /api/boost → x402 config ($1.50)', boost.status === 200 && boost.body.x402.amountMicroUnits === 1500000],
         ['POST /mcp tools/list → 5 tools (streamable-http)', list.status === 200 && list.body.result.tools.length === 5],
-        ['GET /api/trending → feed incl. a closed coin', trend.status === 200 && JSON.parse(trend.body).feed.some(c => c.closed)],
+        ['POST /api/record → ok (confirmed-mint flow)', rec.status === 200 && rec.body.ok === true],
+        ['GET /api/trending → store feed incl. the just-recorded coin', trend.status === 200 && JSON.parse(trend.body).feed.some(c => c.ref === 'test:1')],
       ];
       console.log('MomentMint server self-test:');
       let pass = 0; for (const [n, ok] of checks) { console.log(ok ? 'PASS' : 'FAIL', '·', n); if (ok) pass++; }

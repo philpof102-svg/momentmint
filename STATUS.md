@@ -53,7 +53,8 @@ relayer key holder + gas funding · flat mint-fee level ($0.49 vs lower) · IP a
 _Last write: 2026-06-30 — 4 modules, 37/37: `moment-coin` (Clanker v4 deploy GROUNDED) + `tweet-moment`
 (tokenize a tweet on X) + `boost-paywall` (x402 flat fee) + `mcp-server` (read-only/descriptor-only MCP tools:
 mint_moment / mint_tweet / boost_quote / moment_timebox / trending). All descriptor-only. Stack = Clanker partner
-interface on Base. Ethics GO. **DEPLOYED LIVE** at momentmint-production.up.railway.app — `app.js` (7/7) serves UI +
-descriptor APIs + `/mcp` + `/health`; summery Kalshi/Polymarket UI (public/index.html, screenshotted); 44/44 across 5
-suites. Next: real on-chain minting (needs Phil's relayer + gates), Farcaster Frame endpoints, sqlite trending store.
+interface on Base. Ethics GO. **DEPLOYED LIVE** at momentmint-production.up.railway.app — `app.js` (8/8) serves UI +
+descriptor APIs + `/api/record` + `/mcp` + `/health`; `store.js` (7/7, zero-dep JSON persistence: moment→coin index +
+trending feed, de-duped, live/closed status); summery Kalshi/Polymarket UI (screenshotted); **52/52 across 6 suites**.
+Next: Farcaster Frame endpoints (in-feed mint, return descriptors), then real on-chain minting (needs Phil's relayer + gates).
 **Gates pending Phil for live minting: relayer key + gas · mint-fee level ($0.49 vs lower) · IP appetite (named vs generic).**_
