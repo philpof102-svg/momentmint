@@ -43,6 +43,11 @@ function coinByRef(ref) {
 }
 const appBase = (req) => (req.headers['x-forwarded-proto'] || 'https') + '://' + (req.headers.host || 'momentmint-production.up.railway.app');
 
+// MomentMint's fee recipient = the MainStreet operator ADDRESS (Phil 2026-06-30 "use the same key as MainStreet").
+// PUBLIC address only — used as the 40% Clanker interface slot + the x402 Boost payTo. The server NEVER holds
+// or uses a private key; the CREATOR signs their own mint with their wallet (descriptor-only, one tap).
+const PLATFORM = process.env.MOMENTMINT_FEE_RECIPIENT || '0xAC3ca7c5d3cDD7702fd08F9C4C28dAA22296aDa9';
+
 const json = (res, code, obj, extra) => { res.writeHead(code, { 'content-type': 'application/json', ...(extra || {}) }); res.end(JSON.stringify(obj)); };
 const body = (req) => new Promise((r) => { let b = ''; req.on('data', (c) => { b += c; if (b.length > 1e6) req.destroy(); }); req.on('end', () => { try { r(b ? JSON.parse(b) : {}); } catch { r(null); } }); });
 
@@ -59,16 +64,16 @@ function createServer() {
 
       if (req.method === 'POST' && url === '/api/mint-moment') {
         const a = await body(req) || {};
-        const spec = buildMomentCoin({ title: a.title, kind: a.kind, ref: a.ref, image: a.image, startSec: a.startSec, endSec: a.endSec }, { creator: a.creator, interfaceFeeRecipient: a.interfaceFeeRecipient, ticker: a.ticker });
+        const spec = buildMomentCoin({ title: a.title, kind: a.kind, ref: a.ref, image: a.image, startSec: a.startSec, endSec: a.endSec }, { creator: a.creator || PLATFORM, interfaceFeeRecipient: a.interfaceFeeRecipient || PLATFORM, ticker: a.ticker });
         return json(res, 200, { spec, descriptor: clankerDeployDescriptor(spec) });
       }
       if (req.method === 'POST' && url === '/api/mint-tweet') {
         const a = await body(req) || {};
-        return json(res, 200, tweetMoment(a.tweet || a, { creator: a.creator, interfaceFeeRecipient: a.interfaceFeeRecipient, ticker: a.ticker }));
+        return json(res, 200, tweetMoment(a.tweet || a, { creator: a.creator || PLATFORM, interfaceFeeRecipient: a.interfaceFeeRecipient || PLATFORM, ticker: a.ticker }));
       }
       if (req.method === 'POST' && url === '/api/boost') {
         const a = await body(req) || {};
-        return json(res, 200, boostPaywall(a.tier || 'mint', { payTo: a.payTo, usdOverride: a.usdOverride }));
+        return json(res, 200, boostPaywall(a.tier || 'mint', { payTo: a.payTo || PLATFORM, usdOverride: a.usdOverride }));
       }
       if (req.method === 'GET' && url === '/api/trending') return json(res, 200, { feed: store.list() });
       if (req.method === 'POST' && url === '/api/record') { const a = await body(req) || {}; if (!a.tk || !a.ref) return json(res, 400, { error: 'tk + ref required' }); store.record(a); return json(res, 200, { ok: true, count: store.all().length }); }

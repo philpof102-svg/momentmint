@@ -6,7 +6,11 @@ Coin the moment in one tap, on Base via **Clanker**. See `CONCEPT.md`. NEW stand
 ## 🚀 LIVE: https://momentmint-production.up.railway.app
 Own Railway project `momentmint` (workspace "phil pof's Projects"). Serves the UI + `/api/mint-moment` /
 `/api/mint-tweet` / `/api/boost` / `/api/trending` (descriptor-only) + `/mcp` (5 agent tools) + `/health`.
-**App shell is LIVE; on-chain minting awaits Phil's relayer + the gates.** Verified end-to-end 2026-06-30.
+**App shell is LIVE.** Verified end-to-end 2026-06-30.
+**Gates RESOLVED (Phil 2026-06-30):** fees → the **MainStreet operator ADDRESS `0xAC3ca7c5…`** (public; default
+`interfaceFeeRecipient` + Boost `payTo`). The agent holds **NO private key** — the **CREATOR signs their own mint**
+(descriptor-only, one-tap wallet). Mint fee **$0.49**. **Named players OK** (IP = Phil's accepted call).
+Remaining for live minting: the mini-app's wallet-connect + sign step (user-side), not an agent action.
 
 ## Control plane (read FIRST)
 - **North-Star:** the trending mass behavior — tap-to-coin / one-tap-buy a *moment* — monetized as a **Clanker
