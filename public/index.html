@@ -161,7 +161,7 @@
 <div class="app">
   <div class="top">
     <div class="logo"><span class="sun"></span><b>Moment<i>Mint</i></b></div>
-    <div class="wal"><span class="av"></span> demo <span class="bal">not connected</span></div>
+    <div class="wal" onclick="connectWallet().then(ok=>toast('●',ok?'Wallet connected on Base':'No wallet found — install Coinbase Wallet or MetaMask')).catch(()=>{})" style="cursor:pointer" title="Connect your wallet"><span class="av"></span> demo <span class="bal">not connected</span></div>
   </div>
   <div class="scroll">
     <div class="tick"><div class="tick-tr" id="tick"></div></div>
@@ -242,7 +242,29 @@ walletReady=(async()=>{ try{
   const prov = await sdk.wallet.getEthereumProvider();
   const acc = prov && await prov.request({method:'eth_requestAccounts'});
   if(acc && acc[0]){ walletProvider=prov; wallet=acc[0]; const w=document.querySelector('.wal'); if(w) w.innerHTML='<span class="av"></span> '+wallet.slice(0,6)+'…'+wallet.slice(-2)+' <span class="bal">connected</span>'; }
-}catch(e){ /* not in a Farcaster client → demo mode */ } })();
+}catch(e){ /* not in a Farcaster client → try a browser wallet on Coin it */ } })();
+
+const BASE_HEX='0x2105'; // Base mainnet = 8453
+async function ensureBaseChain(prov){
+  try{ if((await prov.request({method:'eth_chainId'}))===BASE_HEX) return;
+    try{ await prov.request({method:'wallet_switchEthereumChain',params:[{chainId:BASE_HEX}]}); }
+    catch(e){ if(e&&e.code===4902){ await prov.request({method:'wallet_addEthereumChain',params:[{chainId:BASE_HEX,chainName:'Base',nativeCurrency:{name:'Ether',symbol:'ETH',decimals:18},rpcUrls:['https://mainnet.base.org'],blockExplorerUrls:['https://basescan.org']}]}); } else throw e; }
+  }catch(e){ /* user can switch manually; viem still targets Base */ }
+}
+// Connect on a user gesture: Farcaster Mini App wallet first, else an injected browser wallet (Coinbase Wallet / MetaMask).
+async function connectWallet(){
+  if(wallet && walletProvider) return true;
+  await walletReady;                                  // let the Farcaster auto-detect settle
+  if(wallet && walletProvider) return true;
+  const inj = (typeof window!=='undefined') && (window.ethereum || null);
+  if(!inj) return false;                               // no wallet → caller shows the how-to
+  const acc = await inj.request({method:'eth_requestAccounts'});
+  if(!acc || !acc[0]) return false;
+  await ensureBaseChain(inj);
+  walletProvider = inj; wallet = acc[0];
+  const w=document.querySelector('.wal'); if(w) w.innerHTML='<span class="av"></span> '+wallet.slice(0,6)+'…'+wallet.slice(-2)+' <span class="bal">Base</span>';
+  return true;
+}
 
 // REAL on-chain mint via clanker-sdk v4 (grounded on clanker.gitbook.io/sdk/v4.0.0). The USER signs with their
 // Farcaster wallet — the app never holds a key. Runs ONLY when a wallet is present (gated in coinIt); a plain
@@ -264,11 +286,14 @@ async function mintOnChain(descriptor){           // consume the GROUNDED + vali
   const p = descriptor.params;                      // name/symbol/image/rewards/fees(static 1%)/context — all grounded server-side
   // the server uses the platform addr as a placeholder for both slots; swap recipients[0] (creator) to the signer
   const recipients = (p.rewards && p.rewards.recipients || []).map((r,i)=> i===0 ? { ...r, recipient: wallet, admin: wallet } : r);
-  const { waitForTransaction } = await clanker.deploy({
+  const { txHash, waitForTransaction, error } = await clanker.deploy({
     name: p.name, symbol: p.symbol, image: p.image || '', tokenAdmin: wallet,
     context: p.context, rewards: { recipients }, fees: p.fees,
   });
-  const { address } = await waitForTransaction();
+  if (error) throw error;                            // clanker-sdk RETURNS an error instead of throwing — surface it
+  if (typeof waitForTransaction !== 'function') throw new Error('deploy returned no transaction handle');
+  console.log('[momentmint] deploy tx', txHash);     // tx submitted — confirm/track on basescan
+  const { address } = await waitForTransaction();    // wait for the token contract address
   return address;
 }
 function setTier(t){tier=t; const b=document.getElementById('coinbtn');
@@ -297,42 +322,35 @@ function startCd(el,secs){function tick(){if(secs<=0){el.textContent='CLOSED'; e
   const m=String(Math.floor(secs/60)).padStart(2,'0'),s=String(secs%60).padStart(2,'0'); el.textContent=m+':'+s; el.classList.toggle('warm',secs<120); secs--;}
   tick(); timers.push(setInterval(tick,1000));}
 
-async function coinIt(){ if(!cur)return; const card=document.getElementById('card');
-  document.getElementById('coinbtn').disabled=true;
+async function coinIt(){ if(!cur)return;
+  const btn=document.getElementById('coinbtn'); btn.disabled=true; const stop=()=>{ btn.disabled=false; };
   const nowS=Math.floor(Date.now()/1000), endS=nowS+(cur.secs||86400);
   const ref = cur.by ? ('x:'+cur.by+':'+nowS) : ('m:'+cur.tk+':'+nowS); curRef=ref;
   let descriptor=null, mintedAddr=null;
-  try{                                            // call the LIVE backend for the real Clanker descriptor + record it
+  try{                                            // fetch the grounded Clanker descriptor from the live backend
     const isTweet=!!cur.by, url=isTweet?'/api/mint-tweet':'/api/mint-moment';
     const payload=isTweet ? { tweet:{ id:String(nowS), text:cur.nm, authorHandle:cur.by }, ticker:cur.tk }
                           : { title:cur.nm, kind:cur.kind||'moment', ref, startSec:nowS, endSec:endS, ticker:cur.tk };
     const r=await fetch(url,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});
     descriptor=(await r.json()).descriptor;
-    await fetch('/api/record',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({nm:cur.nm,tk:cur.tk,em:cur.em,ref,endSec:endS})});
-  }catch(e){ /* offline → demo */ }
-  if(wallet){                                     // real on-chain mint — the USER signs in their Farcaster wallet
-    toast('●','Minting $'+cur.tk+' — confirm in your wallet…');
-    try{ await walletReady; mintedAddr=await mintOnChain(descriptor); }   // wait for the connect attempt, then the user signs the grounded descriptor
-    catch(e){ toast('●','Mint cancelled — '+String(e&&e.message||'').slice(0,44));  // FAILED → no fake LIVE card; let them retry
-      document.getElementById('coinbtn').disabled=false; document.querySelectorAll('.chip').forEach(x=>x.classList.remove('sel')); return; }
-    toast('●','Live! $'+cur.tk+' minted'+(mintedAddr?' '+mintedAddr.slice(0,8)+'…':''));
-  } else {
-    toast('●','Coined (demo) — open in Farcaster to mint on-chain');
-  }
+  }catch(e){ console.error('[momentmint descriptor]', e); }
+  if(!descriptor){ toast('●','Backend unreachable — try again in a moment'); return stop(); }
+  toast('●','Connecting your wallet…');
+  let haveWallet=false; try{ haveWallet=await connectWallet(); }catch(e){ console.error('[momentmint connect]', e); }
+  if(!haveWallet){ toast('●','No wallet found — install Coinbase Wallet or MetaMask, or open MomentMint in a Farcaster app'); return stop(); }
+  toast('●','Minting $'+cur.tk+' — confirm in your wallet…');   // the USER signs the real Clanker deploy on Base
+  try{ mintedAddr=await mintOnChain(descriptor); }
+  catch(e){ console.error('[momentmint mint]', e); toast('●','Mint failed — '+String(e&&e.message||e).slice(0,70)); return stop(); }
+  try{ await fetch('/api/record',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({nm:cur.nm,tk:cur.tk,em:cur.em,ref,endSec:endS})}); }catch(e){} // record only REAL coins → honest feed
+  toast('●','Live! $'+cur.tk+' minted '+String(mintedAddr).slice(0,8)+'…');
   curMinted=mintedAddr;
-  card.classList.add('flip');
-  setTimeout(async ()=>{                           // honest post-coin card: LIVE only with a real on-chain address, else DEMO
-    const live=!!mintedAddr;
-    const head=`<div class="row"><div class="art"><span>${esc(cur.em)}</span></div>
-      <div><div class="nm">${esc(cur.nm)}</div><div class="tk">$${esc(cur.tk)} · ${live?'LIVE on Base':'DEMO'}</div></div></div>`;
-    const bodyHtml = live
-      ? `<div class="badges"><span class="bdg good">minted on-chain</span></div>
-         <div class="disc">minted ${esc(mintedAddr.slice(0,10))}… — trades on Base via Clanker. closes when the moment ends; still trades on-chain after. speculative, not advice.</div>
-         <button class="share" onclick="shareCoin()">Share to earn 40% ↗</button>`
-      : `<div class="badges"><span class="bdg">demo — not minted on-chain</span></div>
-         <div class="disc">open in a Farcaster client to mint $${esc(cur.tk)} for real — you sign in your own wallet. no on-chain coin exists yet. speculative, not advice.</div>
-         <button class="share" onclick="shareCoin()">Share ↗</button>`;
-    card.innerHTML=head+bodyHtml;
+  const card=document.getElementById('card'); card.classList.add('flip');
+  setTimeout(async ()=>{                           // LIVE card only with a real on-chain address
+    card.innerHTML=`<div class="row"><div class="art"><span>${esc(cur.em)}</span></div>
+      <div><div class="nm">${esc(cur.nm)}</div><div class="tk">$${esc(cur.tk)} · LIVE on Base</div></div></div>
+      <div class="badges"><span class="bdg good">minted on-chain</span></div>
+      <div class="disc">minted ${esc(String(mintedAddr).slice(0,10))}… — trades on Base via Clanker. closes when the moment ends; still trades on-chain after. speculative, not advice.</div>
+      <button class="share" onclick="shareCoin()">Share to earn 40% ↗</button>`;
     await loadTrending();
   },300);
   document.querySelectorAll('.chip').forEach(x=>x.classList.remove('sel'));}
