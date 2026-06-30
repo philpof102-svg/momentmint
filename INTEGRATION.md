@@ -37,7 +37,11 @@ is clanker.world social-provenance only; MomentMint's revenue is SOLELY its `rec
    accrual matches the 40/40/20 math; if Clanker's protocol cut or default differs in practice, reconcile then).
 3. Wire the **Buy** path (one-tap permit buy via the same wallet) + the **Share** action (post the `/m/:ref` Frame
    to the feed via `sdk.actions.composeCast`).
-4. Set the publish manifest (`/.well-known/farcaster.json`) so the mini-app is installable.
+4. ✓ BUILT: `/.well-known/farcaster.json` is served (miniapp metadata grounded + length-checked) + `/icon.svg`.
+   Remaining Phil-side: (a) sign the `accountAssociation` for the domain → set env `MOMENTMINT_FC_HEADER` /
+   `MOMENTMINT_FC_PAYLOAD` / `MOMENTMINT_FC_SIGNATURE` (empty until signed — never fabricated); (b) supply real PNG
+   assets (1024² icon no-alpha, 200² splash, 1200×630 og) → env `MOMENTMINT_ICON_URL` / `MOMENTMINT_SPLASH_URL` /
+   `MOMENTMINT_OG_URL` override the SVG defaults.
 
 **Status:** off-chain flow LIVE + verified; on-chain deploy GROUNDED (fees+context+rewards owned by the backend
 descriptor, validated server-side, frontend consumes it, user-signed, gated on a Farcaster wallet) but **not yet
