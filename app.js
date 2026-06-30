@@ -5,7 +5,7 @@
  * One zero-dep node server that:
  *   - serves the mini-app UI (public/)
  *   - exposes DESCRIPTOR-ONLY build APIs (a human/relayer signs the returned tx):
- *       POST /api/mint-moment   → { spec, descriptor }  (Clanker v4 deployWithTokenizedFees)
+ *       POST /api/mint-moment   → { spec, descriptor }  (Clanker v4 deploy(), descriptor-only)
  *       POST /api/mint-tweet    → tokenize a tweet on X
  *       POST /api/boost         → x402 paywall config for a tier
  *       GET  /api/trending      → the live moment-coin feed
@@ -21,7 +21,7 @@ const { tweetMoment } = require('./tweet-moment');
 const { boostPaywall } = require('./boost-paywall');
 const { dispatch, SERVER } = require('./mcp-server');
 const { createStore } = require('./store');
-const { coinSharePage, coinOgSvg } = require('./frame');
+const { coinSharePage, coinOgSvg, farcasterManifest, appIconSvg } = require('./frame');
 
 const ROOT = path.join(__dirname, 'public');
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon' };
@@ -99,6 +99,15 @@ function createServer() {
         const ref = decodeURIComponent(url.slice(4, -4));
         res.writeHead(200, { 'content-type': 'image/svg+xml; charset=utf-8' }); return res.end(coinOgSvg(coinByRef(ref)));
       }
+      // app icon (summery sun) — used by the manifest iconUrl/splashImageUrl
+      if (req.method === 'GET' && url === '/icon.svg') { res.writeHead(200, { 'content-type': 'image/svg+xml; charset=utf-8' }); return res.end(appIconSvg()); }
+      // installable Farcaster Mini App manifest. accountAssociation comes from env (the operator signs the domain) — never fabricated.
+      if (req.method === 'GET' && url === '/.well-known/farcaster.json') {
+        const e = process.env;
+        const acc = (e.MOMENTMINT_FC_HEADER && e.MOMENTMINT_FC_PAYLOAD && e.MOMENTMINT_FC_SIGNATURE)
+          ? { header: e.MOMENTMINT_FC_HEADER, payload: e.MOMENTMINT_FC_PAYLOAD, signature: e.MOMENTMINT_FC_SIGNATURE } : undefined;
+        return json(res, 200, farcasterManifest({ appUrl: appBase(req), accountAssociation: acc, iconUrl: e.MOMENTMINT_ICON_URL, splashImageUrl: e.MOMENTMINT_SPLASH_URL, ogImageUrl: e.MOMENTMINT_OG_URL }));
+      }
 
       if (req.method === 'GET') {
         let p = decodeURIComponent(url); if (p === '/') p = '/index.html';
@@ -133,6 +142,8 @@ if (require.main === module) {
       const trend = await get('/api/trending');
       const frame = await get('/m/wc:fra:71');
       const og = await get('/og/wc:fra:71.svg');
+      const manifest = await get('/.well-known/farcaster.json');
+      const icon = await get('/icon.svg');
 
       const checks = [
         ['GET /health → ok + descriptorOnly', health.status === 200 && JSON.parse(health.body).descriptorOnly === true],
@@ -145,6 +156,8 @@ if (require.main === module) {
         ['GET /api/trending → store feed incl. the just-recorded coin', trend.status === 200 && JSON.parse(trend.body).feed.some(c => c.ref === 'test:1')],
         ['GET /m/:ref → Farcaster Mini App embed share page (fc:miniapp + launch_miniapp)', frame.status === 200 && /fc:miniapp/.test(frame.body) && /launch_miniapp/.test(frame.body)],
         ['GET /og/:ref.svg → 3:2 coin OG image', og.status === 200 && /<svg/.test(og.body) && /width="600" height="400"/.test(og.body)],
+        ['GET /.well-known/farcaster.json → installable manifest (miniapp v1, Base chain, accountAssociation pending signature)', manifest.status === 200 && (() => { const m = JSON.parse(manifest.body); return m.miniapp.version === '1' && m.miniapp.requiredChains.includes('eip155:8453') && m.accountAssociation.signature === ''; })()],
+        ['GET /icon.svg → 1024x1024 app icon', icon.status === 200 && /width="1024" height="1024"/.test(icon.body)],
       ];
       console.log('MomentMint server self-test:');
       let pass = 0; for (const [n, ok] of checks) { console.log(ok ? 'PASS' : 'FAIL', '·', n); if (ok) pass++; }

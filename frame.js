@@ -62,7 +62,54 @@ function coinOgSvg(coin) {
 </svg>`;
 }
 
-module.exports = { miniAppEmbed, coinSharePage, coinOgSvg };
+/** 1024x1024 app icon (summery sun + M monogram). SVG scales for the 200x200 splash too. NOTE: a public
+ *  Farcaster listing wants a 1024x1024 PNG with NO alpha — rasterize this (the solid cream bg satisfies no-alpha). */
+function appIconSvg() {
+  const rays = [0, 45, 90, 135, 180, 225, 270, 315]
+    .map((d) => `<line x1="512" y1="150" x2="512" y2="250" transform="rotate(${d} 512 512)"/>`).join('');
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<defs><linearGradient id="s" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFD23D"/><stop offset=".5" stop-color="#FF9A00"/><stop offset="1" stop-color="#FF6A00"/></linearGradient></defs>
+<rect width="1024" height="1024" fill="#FFF3DE"/>
+<g stroke="url(#s)" stroke-width="46" stroke-linecap="round">${rays}</g>
+<circle cx="512" cy="512" r="252" fill="url(#s)"/>
+<text x="512" y="612" font-family="ui-monospace,SFMono-Regular,monospace" font-weight="800" font-size="300" fill="#2A1A05" text-anchor="middle">M</text>
+</svg>`;
+}
+
+/** the /.well-known/farcaster.json manifest (grounded on miniapps.farcaster.xyz/docs/specification 2026).
+ *  The `miniapp` block is built from app metadata; `accountAssociation` MUST be signed by the domain's Farcaster
+ *  custody key and is supplied by the operator (env) — NEVER fabricated here (empty {} = pending the operator's signature). */
+function farcasterManifest(opts = {}) {
+  const appUrl = (opts.appUrl || 'https://momentmint-production.up.railway.app').replace(/\/$/, '');
+  const domain = (opts.domain || appUrl).replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  const icon = opts.iconUrl || (appUrl + '/icon.svg');
+  return {
+    accountAssociation: opts.accountAssociation || { header: '', payload: '', signature: '' }, // ← operator signs `domain`; empty = pending
+    miniapp: {
+      version: '1',
+      name: 'MomentMint',                                       // <=32
+      homeUrl: appUrl,                                          // <=1024
+      iconUrl: icon,                                            // 1024x1024 PNG (no alpha) for a public listing
+      splashImageUrl: opts.splashImageUrl || icon,             // 200x200
+      splashBackgroundColor: SPLASH_BG,                        // hex
+      subtitle: 'Coin the moment on Base',                     // <=30, no emoji
+      description: 'Turn a moment, a tweet or a cast into a tradeable coin in one tap on Base. The creator earns 40 percent of trades. Time-boxed and speculative.', // <=170
+      primaryCategory: 'finance',                              // grounded enum
+      tags: ['base', 'clanker', 'memecoin', 'trade', 'moments'], // <=5, <=20 each
+      tagline: 'Coin the moment in one tap',                   // <=30
+      ogTitle: 'MomentMint',                                   // <=30
+      ogDescription: 'Coin a moment, a tweet or a cast on Base.', // <=100
+      ogImageUrl: opts.ogImageUrl || icon,                     // 1200x630 PNG
+      heroImageUrl: opts.heroImageUrl || opts.ogImageUrl || icon, // 1200x630
+      canonicalDomain: domain,                                 // no protocol/port/path
+      noindex: false,
+      requiredChains: ['eip155:8453'],                         // Base (CAIP-2)
+      requiredCapabilities: ['actions.ready', 'wallet.getEthereumProvider', 'actions.composeCast'],
+    },
+  };
+}
+
+module.exports = { miniAppEmbed, coinSharePage, coinOgSvg, appIconSvg, farcasterManifest };
 
 // ---- SELF-TEST (the checker) ---------------------------------------------
 if (require.main === module) {
@@ -80,6 +127,10 @@ if (require.main === module) {
     ['share page has og:image + a human "Open in MomentMint" link + honest disclaimer', /og:image/.test(page) && /Open in MomentMint/.test(page) && /never "verified"/.test(page)],
     ['OG svg is 3:2 (600x400) + shows the ticker + summery sun gradient', /width="600" height="400"/.test(svg) && /\$MBAPPE71/.test(svg) && /linearGradient/.test(svg)],
     ['attributes escaped (no raw quote-break in the embed meta)', !/content='[^']*'[^>]*'/.test(page.split('fc:miniapp')[1].slice(0, 400))],
+    ['manifest: accountAssociation + miniapp v1, name<=32, Base chain, finance category (grounded farcaster.json)', (() => { const m = farcasterManifest({ appUrl: 'https://x.app' }); return !!m.accountAssociation && m.miniapp.version === '1' && m.miniapp.name.length <= 32 && m.miniapp.requiredChains.includes('eip155:8453') && m.miniapp.primaryCategory === 'finance'; })()],
+    ['manifest: field length limits respected (subtitle<=30, description<=170, tags<=5 each<=20, tagline<=30)', (() => { const a = farcasterManifest().miniapp; return a.subtitle.length <= 30 && a.description.length <= 170 && a.tags.length <= 5 && a.tags.every(t => t.length <= 20) && a.tagline.length <= 30; })()],
+    ['manifest: accountAssociation NOT fabricated (empty signature until the operator signs the domain)', farcasterManifest().accountAssociation.signature === ''],
+    ['app icon: 1024x1024 summery sun, solid bg (no alpha when rasterized)', /width="1024" height="1024"/.test(appIconSvg()) && /linearGradient/.test(appIconSvg()) && /fill="#FFF3DE"/.test(appIconSvg())],
     ['no signing/funds surface', !Object.keys(module.exports).some(k => /sign|send|deploy|charge|transfer/i.test(k))],
   ];
   console.log('embed:', JSON.stringify(embed.button));
