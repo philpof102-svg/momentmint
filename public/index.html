@@ -161,7 +161,7 @@
 <div class="app">
   <div class="top">
     <div class="logo"><span class="sun"></span><b>Moment<i>Mint</i></b></div>
-    <div class="wal"><span class="av"></span> 0x7a…3f <span class="bal">$24.10</span></div>
+    <div class="wal"><span class="av"></span> demo <span class="bal">not connected</span></div>
   </div>
   <div class="scroll">
     <div class="tick"><div class="tick-tr" id="tick"></div></div>
@@ -231,10 +231,12 @@ document.getElementById('tabs').addEventListener('click',e=>{const t=e.target.cl
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===t));
   document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.dataset.pane===t.dataset.pane));});
 
-let cur=null, tier='mint', timers=[], wallet=null, walletProvider=null, fcSdk=null, curRef=null; const tierPx={free:'$0',mint:'$0.49',boost:'$1.50'};
+let cur=null, tier='mint', timers=[], wallet=null, walletProvider=null, fcSdk=null, curRef=null, walletReady=null, curMinted=null; const tierPx={free:'$0',mint:'$0.49',boost:'$1.50'};
 const PLATFORM_ADDR='0xAC3ca7c5d3cDD7702fd08F9C4C28dAA22296aDa9'; // MomentMint fee recipient = MainStreet operator addr
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); // escape ANY value before innerHTML (XSS-safe)
 // Farcaster Mini App wallet — connects in a Farcaster client; stays null (demo) in a plain browser.
-(async()=>{ try{
+// walletReady resolves once the connect attempt settles, so coinIt can `await` it before minting (no race).
+walletReady=(async()=>{ try{
   const { sdk } = await import('https://esm.sh/@farcaster/miniapp-sdk');
   await sdk.actions.ready(); fcSdk=sdk;
   const prov = await sdk.wallet.getEthereumProvider();
@@ -246,11 +248,15 @@ const PLATFORM_ADDR='0xAC3ca7c5d3cDD7702fd08F9C4C28dAA22296aDa9'; // MomentMint 
 // Farcaster wallet — the app never holds a key. Runs ONLY when a wallet is present (gated in coinIt); a plain
 // browser stays in descriptor-preview demo. ⚠️ Needs final testing in a real Farcaster client + funded wallet.
 async function mintOnChain(coin, ref){
-  const [{ Clanker }, viem, { base }] = await Promise.all([
-    import('https://esm.sh/clanker-sdk/v4'),
-    import('https://esm.sh/viem'),
-    import('https://esm.sh/viem/chains'),
-  ]);
+  let Clanker, viem, base;
+  try{                                            // load the mint SDK from the CDN; surface a clear error if it can't
+    const m = await Promise.all([
+      import('https://esm.sh/clanker-sdk/v4'),
+      import('https://esm.sh/viem'),
+      import('https://esm.sh/viem/chains'),
+    ]);
+    Clanker = m[0].Clanker; viem = m[1]; base = m[2].base;
+  }catch(e){ throw new Error('could not load the mint SDK — check connection and reload'); }
   const publicClient = viem.createPublicClient({ chain: base, transport: viem.http() });
   const walletClient = viem.createWalletClient({ account: wallet, chain: base, transport: viem.custom(walletProvider) });
   const clanker = new Clanker({ publicClient, wallet: walletClient });
@@ -261,7 +267,8 @@ async function mintOnChain(coin, ref){
       { recipient: wallet, admin: wallet, bps: 5000, token: 'Both' },           // creator (the user) — 50% of the reward pool
       { recipient: PLATFORM_ADDR, admin: PLATFORM_ADDR, bps: 5000, token: 'Both' }, // MomentMint — 50% (the platform cut)
     ] },
-    fees: { type: 'static', clankerFee: 100, pairedFee: 100 },
+    // fees: LEFT TO THE clanker-sdk DEFAULT (standard Clanker fee). Do NOT hardcode an ungrounded fee/units —
+    // confirm the exact fee config in the FIRST human-signed test deploy + verify on-chain accrual (INTEGRATION.md).
   });
   const { address } = await waitForTransaction();
   return address;
@@ -280,10 +287,10 @@ function pasteCast(){preview({nm:'a cast',tk:'CAST',em:'✦',secs:43200});}
 
 function preview(m){cur=m; timers.forEach(clearInterval); timers=[];
   document.getElementById('coinbtn').disabled=false;
-  const by=m.by?`<span class="bdg">by ${m.by}</span>`:'';
+  const by=m.by?`<span class="bdg">by ${esc(m.by)}</span>`:'';
   document.getElementById('stage').innerHTML=`<div class="card" id="card">
-    <div class="row"><div class="art"><span>${m.em}</span></div>
-      <div><div class="nm">${m.nm}</div><div class="tk">$${m.tk} · supply 1,000,000</div></div></div>
+    <div class="row"><div class="art"><span>${esc(m.em)}</span></div>
+      <div><div class="nm">${esc(m.nm)}</div><div class="tk">$${esc(m.tk)} · supply 1,000,000</div></div></div>
     <div class="badges"><span class="bdg good">creator earns 40%</span><span class="bdg">you +40% as the app</span>${by}</div>
     <div class="clock"><span class="l">live window closes in</span><span class="cd" id="cd">--:--</span></div>
     <div class="disc">closes at full-time — the coin still trades on-chain after, trade at your own risk. not investment advice.</div></div>`;
@@ -296,7 +303,7 @@ async function coinIt(){ if(!cur)return; const card=document.getElementById('car
   document.getElementById('coinbtn').disabled=true;
   const nowS=Math.floor(Date.now()/1000), endS=nowS+(cur.secs||86400);
   const ref = cur.by ? ('x:'+cur.by+':'+nowS) : ('m:'+cur.tk+':'+nowS); curRef=ref;
-  let descriptor=null;
+  let descriptor=null, mintedAddr=null;
   try{                                            // call the LIVE backend for the real Clanker descriptor + record it
     const isTweet=!!cur.by, url=isTweet?'/api/mint-tweet':'/api/mint-moment';
     const payload=isTweet ? { tweet:{ id:String(nowS), text:cur.nm, authorHandle:cur.by }, ticker:cur.tk }
@@ -305,26 +312,32 @@ async function coinIt(){ if(!cur)return; const card=document.getElementById('car
     descriptor=(await r.json()).descriptor;
     await fetch('/api/record',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({nm:cur.nm,tk:cur.tk,em:cur.em,ref,endSec:endS})});
   }catch(e){ /* offline → demo */ }
-  card.classList.add('flip');
   if(wallet){                                     // real on-chain mint — the USER signs in their Farcaster wallet
     toast('●','Minting $'+cur.tk+' — confirm in your wallet…');
-    try{ const addr=await mintOnChain(cur, ref); toast('●','Live! $'+cur.tk+' minted'+(addr?' '+addr.slice(0,8)+'…':'')); }
-    catch(e){ toast('●','Mint cancelled/failed — '+String(e&&e.message||'').slice(0,38)); }
+    try{ await walletReady; mintedAddr=await mintOnChain(cur, ref); }   // wait for the connect attempt, then the user signs
+    catch(e){ toast('●','Mint cancelled — '+String(e&&e.message||'').slice(0,44));  // FAILED → no fake LIVE card; let them retry
+      document.getElementById('coinbtn').disabled=false; document.querySelectorAll('.chip').forEach(x=>x.classList.remove('sel')); return; }
+    toast('●','Live! $'+cur.tk+' minted'+(mintedAddr?' '+mintedAddr.slice(0,8)+'…':''));
   } else {
-    toast('●', descriptor ? 'Coined! descriptor ready · open in Farcaster to mint' : 'Coined! (demo)');
+    toast('●','Coined (demo) — open in Farcaster to mint on-chain');
   }
-  setTimeout(async ()=>{ let p=0.0008;
-    card.innerHTML=`<div class="row"><div class="art"><span>${cur.em}</span></div>
-      <div><div class="nm">${cur.nm}</div><div class="tk">$${cur.tk} · LIVE</div></div></div>
-      <div class="trade"><div class="price"><div class="p" id="livep">$0.0008</div><div class="sub">pool $1,240 · 38 holders</div></div>
-      <button class="buy" onclick="buy()">Buy</button></div>
-      <button class="share" onclick="shareCoin()">Share to earn 40% ↗</button>
-      <div class="disc">${wallet?'one tap in your wallet · ':''}closes when the moment ends — still trades on-chain after. speculative, not advice.</div>`;
+  curMinted=mintedAddr;
+  card.classList.add('flip');
+  setTimeout(async ()=>{                           // honest post-coin card: LIVE only with a real on-chain address, else DEMO
+    const live=!!mintedAddr;
+    const head=`<div class="row"><div class="art"><span>${esc(cur.em)}</span></div>
+      <div><div class="nm">${esc(cur.nm)}</div><div class="tk">$${esc(cur.tk)} · ${live?'LIVE on Base':'DEMO'}</div></div></div>`;
+    const bodyHtml = live
+      ? `<div class="badges"><span class="bdg good">minted on-chain</span></div>
+         <div class="disc">minted ${esc(mintedAddr.slice(0,10))}… — trades on Base via Clanker. closes when the moment ends; still trades on-chain after. speculative, not advice.</div>
+         <button class="share" onclick="shareCoin()">Share to earn 40% ↗</button>`
+      : `<div class="badges"><span class="bdg">demo — not minted on-chain</span></div>
+         <div class="disc">open in a Farcaster client to mint $${esc(cur.tk)} for real — you sign in your own wallet. no on-chain coin exists yet. speculative, not advice.</div>
+         <button class="share" onclick="shareCoin()">Share ↗</button>`;
+    card.innerHTML=head+bodyHtml;
     await loadTrending();
-    timers.push(setInterval(()=>{p*=(1+(Math.random()*0.06-0.02)); const el=document.getElementById('livep'); if(el)el.textContent='$'+p.toFixed(4);},1400));
   },300);
   document.querySelectorAll('.chip').forEach(x=>x.classList.remove('sel'));}
-function buy(){toast('●','Bought $'+(cur?cur.tk:'')+' — one tap, paid in USDC');}
 async function shareCoin(){ if(!cur)return;
   const url=location.origin+'/m/'+encodeURIComponent(curRef||('m:'+cur.tk));
   const text='I coined $'+cur.tk+' — '+cur.nm+' on MomentMint ☀ grab it before the moment closes';
@@ -334,9 +347,9 @@ async function shareCoin(){ if(!cur)return;
   toast('●','Link copied · share to spread your coin'); }
 
 let feed=[];
-function feedRow(c){return `<div class="coinrow ${c.closed?'closed':''}"><div class="mini">${c.em}</div>
-  <div class="info"><div class="n">${c.nm}</div><div class="s">$${c.tk}${c.closed?' · moment ended':' · live'}</div></div>
-  ${c.closed?'<span class="closedtag">Moment closed</span>':`<div class="stat"><div class="pr">${c.pr}</div><div class="ch"><span class="pill ${c.up?'up':'down'}">${c.ch}</span></div></div>`}</div>`;}
+function feedRow(c){return `<div class="coinrow ${c.closed?'closed':''}"><div class="mini">${esc(c.em)}</div>
+  <div class="info"><div class="n">${esc(c.nm)}</div><div class="s">$${esc(c.tk)}${c.closed?' · moment ended':' · live'}</div></div>
+  ${c.closed?'<span class="closedtag">Moment closed</span>':`<div class="stat"><div class="pr">${esc(c.pr)}</div><div class="ch"><span class="pill ${c.up?'up':'down'}">${esc(c.ch)}</span></div></div>`}</div>`;}
 function renderFeed(){document.getElementById('feed').innerHTML=feed.map(feedRow).join('')}
 function addToFeed(m){feed.unshift({nm:m.nm,tk:m.tk,em:m.em,pr:"$0.0008",ch:"new",up:true}); renderFeed();}
 async function loadTrending(){ try{ const r=await fetch('/api/trending'); const j=await r.json(); if(Array.isArray(j.feed)){ feed=j.feed; renderFeed(); } }catch(e){ /* offline → demo */ } }

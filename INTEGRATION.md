@@ -18,10 +18,12 @@ await clanker.deploy({
     { recipient: <user>, admin: <user>, bps: 5000, token: 'Both' },               // creator 50% of the reward pool
     { recipient: 0xAC3ca7c5…(operator), admin: 0xAC3ca7c5…, bps: 5000, token: 'Both' }, // MomentMint 50%
   ] },
-  fees: { type: 'static', clankerFee: 100, pairedFee: 100 },
+  // fees: OMITTED → clanker-sdk DEFAULT (standard Clanker fee). Do NOT hardcode an ungrounded fee/units
+  // (an earlier {clankerFee:100,pairedFee:100} was unverified — if bps, 100 = 1% ≈ 5x the ~0.2% doc rate).
 });
 ```
 `rewards.recipients[].bps` must total 10000. Fee recipient = the MainStreet operator address (Phil's call).
+Confirm the EXACT fee config + on-chain accrual in the first human-signed test deploy before trusting any split number.
 
 ## ⚠️ Remaining verification (needs a REAL Farcaster client + a funded wallet — can't be done from a plain browser)
 1. Confirm the esm.sh CDN imports of `clanker-sdk/v4` + `viem` resolve inside the Farcaster mini-app webview
