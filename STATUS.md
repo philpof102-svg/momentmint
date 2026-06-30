@@ -14,7 +14,7 @@ Coin the moment in one tap, on Base via **Clanker**. See `CONCEPT.md`. NEW stand
 - No "verified/safe" claims — honesty is an **app-level time-box**, not a contract freeze. `x-ms-monitor:1` on internal curls.
 
 ## Modules
-### Done (29/29 self-tests across 3 modules, all descriptor-only)
+### Done (37/37 self-tests across 4 modules, all descriptor-only)
 - **`moment-coin.js`** (12/12) — `buildMomentCoin` (validated spec) + `clankerDeployDescriptor` (grounded
   `deployWithTokenizedFees`, partner-interface 40/40/20 via recipients bps) + `momentTimeBox` (app-level honesty).
 - **`tweet-moment.js`** (8/8) — **tokenize a TWEET on X** (Phil 2026-06-30): `parseTweetUrl` + `tweetMoment` → a
@@ -22,6 +22,9 @@ Coin the moment in one tap, on Base via **Clanker**. See `CONCEPT.md`. NEW stand
   auth) / X MCP / Chrome. Reuses the engine. A tweet is just another moment.
 - **`boost-paywall.js`** (9/9) — the flat USDC fee (free / mint $0.49 / boost $1.50) via x402-v2, single payTo (keep
   100%, no split risk), framed as a deliverable not a metered read. Config-only; middleware charges server-side.
+- **`mcp-server.js`** (8/8) — READ-ONLY/descriptor-only MCP tools (`mint_moment` / `mint_tweet` / `boost_quote` /
+  `moment_timebox` / `trending`) so the fleet + any MCP client can BUILD and DISTRIBUTE it. No tool signs/deploys/
+  charges; `mint_*` return `signed:false` descriptors. Trending store INJECTED (no DB coupling). JSON-RPC 2.0.
 ### Next (P1)
 - ✅ **Clanker v4 deploy call GROUNDED** (pool.fans/docs): `deployWithTokenizedFees({name,symbol,image,tokenAdmin,
   rewards:{recipients:[{recipient,admin,bps,token}]}})`. Fee split = `recipients[].bps` (Clanker auto-takes 20%; 80%
@@ -38,7 +41,8 @@ relayer key holder + gas funding · flat mint-fee level ($0.49 vs lower) · IP a
   pause/cheap-mint don't carry the Zora/Clanker fee-split. **Clanker partner-interface = 40% of 0.2%, proven ($13M/200k tokens).**
   Auto-freeze is **app-level** on Clanker (no native on-chain pause). Don't fabricate the SDK call — ground it (P1).
 
-_Last write: 2026-06-30 — 3 modules, 29/29: `moment-coin` (Clanker v4 deploy GROUNDED) + `tweet-moment`
-(tokenize a tweet on X — Phil's extension) + `boost-paywall` (x402 flat fee). All descriptor-only. Stack =
-Clanker partner interface on Base. Ethics GO. Next: better-sqlite3 moment→coin index + trending feed, MCP tools
-(mint-moment / mint-tweet / trending / boost), Frames v2 UI. Live test-deploy needs Phil's relayer + the 4 gates._
+_Last write: 2026-06-30 — 4 modules, 37/37: `moment-coin` (Clanker v4 deploy GROUNDED) + `tweet-moment`
+(tokenize a tweet on X) + `boost-paywall` (x402 flat fee) + `mcp-server` (read-only/descriptor-only MCP tools:
+mint_moment / mint_tweet / boost_quote / moment_timebox / trending). All descriptor-only. Stack = Clanker partner
+interface on Base. Ethics GO. Next: better-sqlite3 trending store + the Frames v2 mini-app UI. Live test-deploy
+needs Phil's relayer key + the 4 gates (relayer/gas · mint-fee level · IP appetite · 14-day kill number)._
