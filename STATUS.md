@@ -6,7 +6,9 @@ Coin the moment in one tap, on Base via **Clanker**. See `CONCEPT.md`. NEW stand
 ## 🚀 LIVE: https://momentmint-production.up.railway.app
 Own Railway project `momentmint` (workspace "phil pof's Projects"). Serves the UI + `/api/mint-moment` /
 `/api/mint-tweet` / `/api/boost` / `/api/trending` (descriptor-only) + `/mcp` (5 agent tools) + `/health`.
-**App shell is LIVE.** Verified end-to-end 2026-06-30.
+**App shell is LIVE.** The mini-app UI now calls the live backend (Coin it → `/api/mint-moment` → real Clanker
+descriptor → `/api/record` → `/api/trending` reflects the new coin; verified end-to-end via Chrome) and detects
+the **Farcaster Mini App wallet** (`@farcaster/miniapp-sdk` via CDN; graceful demo in a plain browser). Verified 2026-06-30.
 **Gates RESOLVED (Phil 2026-06-30):** fees → the **MainStreet operator ADDRESS `0xAC3ca7c5…`** (public; default
 `interfaceFeeRecipient` + Boost `payTo`). The agent holds **NO private key** — the **CREATOR signs their own mint**
 (descriptor-only, one-tap wallet). Mint fee **$0.49**. **Named players OK** (IP = Phil's accepted call).
