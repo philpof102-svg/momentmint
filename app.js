@@ -22,7 +22,7 @@ const { boostPaywall } = require('./boost-paywall');
 const { dispatch, SERVER, TOOLS } = require('./mcp-server');
 const { createStore } = require('./store');
 const { coinSharePage, coinOgSvg, farcasterManifest, appIconSvg } = require('./frame');
-const { xMomentAction, runOnce } = require('./x-agent');
+const { xMomentAction, runOnce, fetchTrending } = require('./x-agent');
 
 const ROOT = path.join(__dirname, 'public');
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon' };
@@ -86,6 +86,17 @@ function createServer() {
         if (Array.isArray(a.candidates)) return json(res, 200, { queue: runOnce(a.candidates, opts) });
         if (a.tweet) return json(res, 200, { action: xMomentAction(a.tweet, opts) });
         return json(res, 400, { error: 'tweet or candidates[] required' });
+      }
+      // LIVE trend-following (gated on env credentials): fetch REAL viral tweets via X search or Grok → coin drafts.
+      if (req.method === 'POST' && url === '/api/x-trending') {
+        const a = await body(req) || {};
+        const opts = { appUrl: appBase(req), creator: a.creator || PLATFORM, interfaceFeeRecipient: a.interfaceFeeRecipient || PLATFORM,
+          trend: a.trend, source: a.source, query: a.query, prompt: a.prompt, limit: a.limit, minScore: a.minScore,
+          bearerToken: process.env.X_BEARER_TOKEN, apiKey: process.env.XAI_API_KEY };
+        if (a.source === 'grok' ? !opts.apiKey : !opts.bearerToken)
+          return json(res, 400, { error: 'live trend-following needs an env key: X_BEARER_TOKEN (X search) or XAI_API_KEY (source:grok). Not set.' });
+        try { return json(res, 200, { queue: await fetchTrending(opts) }); }
+        catch (e) { return json(res, 502, { error: 'trend fetch failed: ' + e.message }); }
       }
       if (req.method === 'GET' && url === '/api/trending') return json(res, 200, { feed: store.list() });
       if (req.method === 'POST' && url === '/api/record') {
@@ -170,6 +181,7 @@ if (require.main === module) {
       const icon = await get('/icon.svg');
       const xmom = await post('/api/x-moment', { tweet: { id: '111', text: 'GOAL Mbappe golazo world cup', authorHandle: 'FabrizioRomano', likes: 50000, retweets: 10000 } });
       const mcpDisc = await get('/.well-known/mcp.json');
+      const xtrend = await post('/api/x-trending', { trend: 'football' });
 
       const checks = [
         ['GET /health → ok + descriptorOnly', health.status === 200 && JSON.parse(health.body).descriptorOnly === true],
@@ -186,6 +198,7 @@ if (require.main === module) {
         ['GET /icon.svg → 1024x1024 app icon', icon.status === 200 && /width="1024" height="1024"/.test(icon.body)],
         ['POST /api/x-moment → autonomous coin + reply DRAFT (descriptor-only, publish-gated)', xmom.status === 200 && xmom.body.action.descriptor.signed === false && xmom.body.action.publish.autoPosted === false],
         ['GET /.well-known/mcp.json → agent discovery (streamable-http endpoint + 6 tools + descriptor-only)', mcpDisc.status === 200 && (() => { const d = JSON.parse(mcpDisc.body); return d.mcp.transport === 'streamable-http' && d.tools.length === 6 && d.safety.descriptorOnly === true; })()],
+        ['POST /api/x-trending → live trend-following gated on env creds (400 without X_BEARER_TOKEN)', xtrend.status === 400 && /X_BEARER_TOKEN/.test(JSON.stringify(xtrend.body))],
       ];
       console.log('XMoment server self-test:');
       let pass = 0; for (const [n, ok] of checks) { console.log(ok ? 'PASS' : 'FAIL', '·', n); if (ok) pass++; }

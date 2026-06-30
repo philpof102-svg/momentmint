@@ -36,6 +36,16 @@ address + `interfaceFeeRecipient`. 3. You get back: a coin **descriptor** (your 
 mint on Base) + a **reply draft** + the per-tweet **redirect link** `/m/x:<id>`. 4. Your user signs the mint;
 you post the reply under your account. **Each tweet → a different coin → a different link.**
 
+## Live trend-following (X search + Grok)
+`POST /api/x-trending` fetches REAL viral tweets and runs the whole pipeline (find → score → coin → draft). Gated on a
+server-side env key (never fabricates — no key → HTTP 400):
+- **X search** (default): set `X_BEARER_TOKEN` (X developer API v2). Body `{ "trend": "football"|"breaking", "query"?, "limit"? }`.
+- **Grok**: body `{ "source": "grok", "prompt"? }` + set `XAI_API_KEY` (console.x.ai). Grok is told to return real tweet ids only.
+
+Returns `{ queue: [ { score, reasons, action } ] }` where each `action` is the coin descriptor + the publish-gated reply
+draft + the per-tweet redirect link. The `football` lane scores by football tags; the `breaking` lane catches live events
+(a rocket launch, breaking news). Scoring requires a topic match, so pure-virality noise is filtered out.
+
 ## Fees / revenue (grounded on clanker.gitbook.io)
 Each trade pays a 1% swap fee. Clanker keeps 20%; recipients split 80% by bps. Pass your own
 `interfaceFeeRecipient` to take the platform 40% slot; the creator (your user) takes 40%.
