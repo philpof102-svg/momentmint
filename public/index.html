@@ -229,15 +229,41 @@ document.getElementById('tabs').addEventListener('click',e=>{const t=e.target.cl
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===t));
   document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.dataset.pane===t.dataset.pane));});
 
-let cur=null, tier='mint', timers=[], wallet=null; const tierPx={free:'$0',mint:'$0.49',boost:'$1.50'};
+let cur=null, tier='mint', timers=[], wallet=null, walletProvider=null; const tierPx={free:'$0',mint:'$0.49',boost:'$1.50'};
+const PLATFORM_ADDR='0xAC3ca7c5d3cDD7702fd08F9C4C28dAA22296aDa9'; // MomentMint fee recipient = MainStreet operator addr
 // Farcaster Mini App wallet — connects in a Farcaster client; stays null (demo) in a plain browser.
 (async()=>{ try{
   const { sdk } = await import('https://esm.sh/@farcaster/miniapp-sdk');
   await sdk.actions.ready();
   const prov = await sdk.wallet.getEthereumProvider();
   const acc = prov && await prov.request({method:'eth_requestAccounts'});
-  if(acc && acc[0]){ wallet=acc[0]; const w=document.querySelector('.wal'); if(w) w.innerHTML='<span class="av"></span> '+wallet.slice(0,6)+'…'+wallet.slice(-2)+' <span class="bal">connected</span>'; }
+  if(acc && acc[0]){ walletProvider=prov; wallet=acc[0]; const w=document.querySelector('.wal'); if(w) w.innerHTML='<span class="av"></span> '+wallet.slice(0,6)+'…'+wallet.slice(-2)+' <span class="bal">connected</span>'; }
 }catch(e){ /* not in a Farcaster client → demo mode */ } })();
+
+// REAL on-chain mint via clanker-sdk v4 (grounded on clanker.gitbook.io/sdk/v4.0.0). The USER signs with their
+// Farcaster wallet — the app never holds a key. Runs ONLY when a wallet is present (gated in coinIt); a plain
+// browser stays in descriptor-preview demo. ⚠️ Needs final testing in a real Farcaster client + funded wallet.
+async function mintOnChain(coin, ref){
+  const [{ Clanker }, viem, { base }] = await Promise.all([
+    import('https://esm.sh/clanker-sdk/v4'),
+    import('https://esm.sh/viem'),
+    import('https://esm.sh/viem/chains'),
+  ]);
+  const publicClient = viem.createPublicClient({ chain: base, transport: viem.http() });
+  const walletClient = viem.createWalletClient({ account: wallet, chain: base, transport: viem.custom(walletProvider) });
+  const clanker = new Clanker({ publicClient, wallet: walletClient });
+  const { waitForTransaction } = await clanker.deploy({
+    name: coin.nm, symbol: coin.tk, tokenAdmin: wallet, image: coin.image || '',
+    context: { interface: 'MomentMint', platform: 'farcaster', messageId: ref, id: '' },
+    rewards: { recipients: [
+      { recipient: wallet, admin: wallet, bps: 5000, token: 'Both' },           // creator (the user) — 50% of the reward pool
+      { recipient: PLATFORM_ADDR, admin: PLATFORM_ADDR, bps: 5000, token: 'Both' }, // MomentMint — 50% (the platform cut)
+    ] },
+    fees: { type: 'static', clankerFee: 100, pairedFee: 100 },
+  });
+  const { address } = await waitForTransaction();
+  return address;
+}
 function setTier(t){tier=t; const b=document.getElementById('coinbtn');
   b.innerHTML=(t==='free'?'Mint free':'Coin it')+` <span class="px">· ${tierPx[t]}</span>`;
   toast('●',t==='boost'?'Boost on — custom art + pinned + sponsored first-buys':t==='free'?'Free seed mint selected':'Standard mint');}
@@ -278,7 +304,13 @@ async function coinIt(){ if(!cur)return; const card=document.getElementById('car
     await fetch('/api/record',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({nm:cur.nm,tk:cur.tk,em:cur.em,ref,endSec:endS})});
   }catch(e){ /* offline → demo */ }
   card.classList.add('flip');
-  toast('●', wallet ? ('Sign in your wallet to mint $'+cur.tk) : (descriptor ? 'Coined! descriptor ready · open in Farcaster to sign' : 'Coined! (demo)'));
+  if(wallet){                                     // real on-chain mint — the USER signs in their Farcaster wallet
+    toast('●','Minting $'+cur.tk+' — confirm in your wallet…');
+    try{ const addr=await mintOnChain(cur, ref); toast('●','Live! $'+cur.tk+' minted'+(addr?' '+addr.slice(0,8)+'…':'')); }
+    catch(e){ toast('●','Mint cancelled/failed — '+String(e&&e.message||'').slice(0,38)); }
+  } else {
+    toast('●', descriptor ? 'Coined! descriptor ready · open in Farcaster to mint' : 'Coined! (demo)');
+  }
   setTimeout(async ()=>{ let p=0.0008;
     card.innerHTML=`<div class="row"><div class="art"><span>${cur.em}</span></div>
       <div><div class="nm">${cur.nm}</div><div class="tk">$${cur.tk} · LIVE</div></div></div>
