@@ -110,6 +110,8 @@
   .price{flex:1} .price .p{font-family:var(--mono); font-size:21px; font-weight:700} .price .sub{font-family:var(--mono); font-size:10px; color:var(--ink2)}
   .buy{font-family:var(--body); font-weight:800; font-size:15px; border:none; border-radius:13px; padding:13px 22px; cursor:pointer; color:#063; background:var(--up-bg); color:var(--up); border:1.5px solid var(--up)}
   .buy:active{transform:scale(.97)}
+  .share{width:100%; margin-top:11px; font-family:var(--body); font-weight:800; font-size:14px; color:#3a1c00; border:1.5px solid var(--orange); border-radius:12px; padding:12px; cursor:pointer; background:#FFF1D6}
+  .share:active{transform:scale(.98)}
 
   /* CTA */
   .cta{margin-top:17px; animation:rise .55s .16s both}
@@ -229,12 +231,12 @@ document.getElementById('tabs').addEventListener('click',e=>{const t=e.target.cl
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===t));
   document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.dataset.pane===t.dataset.pane));});
 
-let cur=null, tier='mint', timers=[], wallet=null, walletProvider=null; const tierPx={free:'$0',mint:'$0.49',boost:'$1.50'};
+let cur=null, tier='mint', timers=[], wallet=null, walletProvider=null, fcSdk=null, curRef=null; const tierPx={free:'$0',mint:'$0.49',boost:'$1.50'};
 const PLATFORM_ADDR='0xAC3ca7c5d3cDD7702fd08F9C4C28dAA22296aDa9'; // MomentMint fee recipient = MainStreet operator addr
 // Farcaster Mini App wallet — connects in a Farcaster client; stays null (demo) in a plain browser.
 (async()=>{ try{
   const { sdk } = await import('https://esm.sh/@farcaster/miniapp-sdk');
-  await sdk.actions.ready();
+  await sdk.actions.ready(); fcSdk=sdk;
   const prov = await sdk.wallet.getEthereumProvider();
   const acc = prov && await prov.request({method:'eth_requestAccounts'});
   if(acc && acc[0]){ walletProvider=prov; wallet=acc[0]; const w=document.querySelector('.wal'); if(w) w.innerHTML='<span class="av"></span> '+wallet.slice(0,6)+'…'+wallet.slice(-2)+' <span class="bal">connected</span>'; }
@@ -293,7 +295,7 @@ function startCd(el,secs){function tick(){if(secs<=0){el.textContent='CLOSED'; e
 async function coinIt(){ if(!cur)return; const card=document.getElementById('card');
   document.getElementById('coinbtn').disabled=true;
   const nowS=Math.floor(Date.now()/1000), endS=nowS+(cur.secs||86400);
-  const ref = cur.by ? ('x:'+cur.by+':'+nowS) : ('m:'+cur.tk+':'+nowS);
+  const ref = cur.by ? ('x:'+cur.by+':'+nowS) : ('m:'+cur.tk+':'+nowS); curRef=ref;
   let descriptor=null;
   try{                                            // call the LIVE backend for the real Clanker descriptor + record it
     const isTweet=!!cur.by, url=isTweet?'/api/mint-tweet':'/api/mint-moment';
@@ -316,12 +318,20 @@ async function coinIt(){ if(!cur)return; const card=document.getElementById('car
       <div><div class="nm">${cur.nm}</div><div class="tk">$${cur.tk} · LIVE</div></div></div>
       <div class="trade"><div class="price"><div class="p" id="livep">$0.0008</div><div class="sub">pool $1,240 · 38 holders</div></div>
       <button class="buy" onclick="buy()">Buy</button></div>
+      <button class="share" onclick="shareCoin()">Share to earn 40% ↗</button>
       <div class="disc">${wallet?'one tap in your wallet · ':''}closes when the moment ends — still trades on-chain after. speculative, not advice.</div>`;
     await loadTrending();
     timers.push(setInterval(()=>{p*=(1+(Math.random()*0.06-0.02)); const el=document.getElementById('livep'); if(el)el.textContent='$'+p.toFixed(4);},1400));
   },300);
   document.querySelectorAll('.chip').forEach(x=>x.classList.remove('sel'));}
 function buy(){toast('●','Bought $'+(cur?cur.tk:'')+' — one tap, paid in USDC');}
+async function shareCoin(){ if(!cur)return;
+  const url=location.origin+'/m/'+encodeURIComponent(curRef||('m:'+cur.tk));
+  const text='I coined $'+cur.tk+' — '+cur.nm+' on MomentMint ☀ grab it before the moment closes';
+  if(fcSdk&&fcSdk.actions&&fcSdk.actions.composeCast){ try{ await fcSdk.actions.composeCast({text, embeds:[url]}); toast('●','Shared to Farcaster — you earn on every trade'); return; }catch(e){} }
+  try{ await navigator.clipboard.writeText(url); }catch(e){}
+  try{ window.open('https://x.com/intent/tweet?text='+encodeURIComponent(text)+'&url='+encodeURIComponent(url),'_blank'); }catch(e){}
+  toast('●','Link copied · share to spread your coin'); }
 
 let feed=[];
 function feedRow(c){return `<div class="coinrow ${c.closed?'closed':''}"><div class="mini">${c.em}</div>
