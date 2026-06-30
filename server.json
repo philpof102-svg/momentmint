@@ -1,0 +1,18 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.philpof102-svg/xmoment",
+  "description": "Turn a viral tweet or moment into a tradeable Clanker coin on Base in one tap ($XMT). Descriptor-only: tools return unsigned plans; a human signs.",
+  "status": "active",
+  "repository": {
+    "url": "https://github.com/philpof102-svg/xmoment",
+    "source": "github"
+  },
+  "version": "0.1.0",
+  "packages": [],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://momentmint-production.up.railway.app/mcp"
+    }
+  ]
+}

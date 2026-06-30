@@ -19,7 +19,7 @@ const http = require('http'), fs = require('fs'), path = require('path');
 const { buildMomentCoin, clankerDeployDescriptor } = require('./moment-coin');
 const { tweetMoment } = require('./tweet-moment');
 const { boostPaywall } = require('./boost-paywall');
-const { dispatch, SERVER } = require('./mcp-server');
+const { dispatch, SERVER, TOOLS } = require('./mcp-server');
 const { createStore } = require('./store');
 const { coinSharePage, coinOgSvg, farcasterManifest, appIconSvg } = require('./frame');
 const { xMomentAction, runOnce } = require('./x-agent');
@@ -49,13 +49,16 @@ const appBase = (req) => (req.headers['x-forwarded-proto'] || 'https') + '://' +
 // or uses a private key; the CREATOR signs their own mint with their wallet (descriptor-only, one tap).
 const PLATFORM = process.env.MOMENTMINT_FEE_RECIPIENT || '0xAC3ca7c5d3cDD7702fd08F9C4C28dAA22296aDa9';
 
-const json = (res, code, obj, extra) => { res.writeHead(code, { 'content-type': 'application/json', ...(extra || {}) }); res.end(JSON.stringify(obj)); };
+// CORS so ANY autonomous agent (incl. browser/web clients) can call /mcp + /api/* cross-origin.
+const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET, POST, OPTIONS', 'access-control-allow-headers': 'content-type, authorization, mcp-protocol-version, mcp-session-id' };
+const json = (res, code, obj, extra) => { res.writeHead(code, { 'content-type': 'application/json', ...CORS, ...(extra || {}) }); res.end(JSON.stringify(obj)); };
 const body = (req) => new Promise((r) => { let b = ''; req.on('data', (c) => { b += c; if (b.length > 1e6) req.destroy(); }); req.on('end', () => { try { r(b ? JSON.parse(b) : {}); } catch { r(null); } }); });
 
 function createServer() {
   return http.createServer(async (req, res) => {
     const url = (req.url || '/').split('?')[0];
     try {
+      if (req.method === 'OPTIONS') { res.writeHead(204, CORS); return res.end(); } // CORS preflight for cross-origin agent clients
       if (req.method === 'GET' && url === '/health') return json(res, 200, { ok: true, server: SERVER, readOnly: true, descriptorOnly: true });
 
       if (url === '/mcp') {
@@ -110,6 +113,18 @@ function createServer() {
       }
       // app icon (summery sun) — used by the manifest iconUrl/splashImageUrl
       if (req.method === 'GET' && url === '/icon.svg') { res.writeHead(200, { 'content-type': 'image/svg+xml; charset=utf-8' }); return res.end(appIconSvg()); }
+      // MCP discovery for autonomous agents: where the streamable-http endpoint is + the tool surface (descriptor-only, never posts).
+      if (req.method === 'GET' && url === '/.well-known/mcp.json') {
+        const b = appBase(req);
+        return json(res, 200, {
+          name: SERVER.name, version: SERVER.version, protocolVersion: '2024-11-05',
+          description: 'XMoment ($XMT) — turn a viral tweet or moment into a tradeable Clanker coin on Base. Descriptor-only: tools return UNSIGNED plans; a human signs. Autonomous-agent friendly (CORS-enabled).',
+          mcp: { endpoint: b + '/mcp', transport: 'streamable-http', methods: ['initialize', 'tools/list', 'tools/call'] },
+          tools: TOOLS.map((t) => ({ name: t.name, description: t.description })),
+          safety: { descriptorOnly: true, signsFunds: false, autoPosts: false, note: 'No tool signs, deploys, moves funds, or posts. mint_* return signed:false descriptors; x_moment returns a publish-GATED reply draft. A human signs the mint + posts the reply.' },
+          homepage: b,
+        });
+      }
       // installable Farcaster Mini App manifest. accountAssociation comes from env (the operator signs the domain) — never fabricated.
       if (req.method === 'GET' && url === '/.well-known/farcaster.json') {
         const e = process.env;
@@ -154,6 +169,7 @@ if (require.main === module) {
       const manifest = await get('/.well-known/farcaster.json');
       const icon = await get('/icon.svg');
       const xmom = await post('/api/x-moment', { tweet: { id: '111', text: 'GOAL Mbappe golazo world cup', authorHandle: 'FabrizioRomano', likes: 50000, retweets: 10000 } });
+      const mcpDisc = await get('/.well-known/mcp.json');
 
       const checks = [
         ['GET /health → ok + descriptorOnly', health.status === 200 && JSON.parse(health.body).descriptorOnly === true],
@@ -169,6 +185,7 @@ if (require.main === module) {
         ['GET /.well-known/farcaster.json → installable manifest (miniapp v1, Base chain, accountAssociation pending signature)', manifest.status === 200 && (() => { const m = JSON.parse(manifest.body); return m.miniapp.version === '1' && m.miniapp.requiredChains.includes('eip155:8453') && m.accountAssociation.signature === ''; })()],
         ['GET /icon.svg → 1024x1024 app icon', icon.status === 200 && /width="1024" height="1024"/.test(icon.body)],
         ['POST /api/x-moment → autonomous coin + reply DRAFT (descriptor-only, publish-gated)', xmom.status === 200 && xmom.body.action.descriptor.signed === false && xmom.body.action.publish.autoPosted === false],
+        ['GET /.well-known/mcp.json → agent discovery (streamable-http endpoint + 6 tools + descriptor-only)', mcpDisc.status === 200 && (() => { const d = JSON.parse(mcpDisc.body); return d.mcp.transport === 'streamable-http' && d.tools.length === 6 && d.safety.descriptorOnly === true; })()],
       ];
       console.log('XMoment server self-test:');
       let pass = 0; for (const [n, ok] of checks) { console.log(ok ? 'PASS' : 'FAIL', '·', n); if (ok) pass++; }

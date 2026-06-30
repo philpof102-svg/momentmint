@@ -1,0 +1,65 @@
+version: 1
+type: http
+runtime: container
+
+startCommand:
+  type: http
+  url: https://momentmint-production.up.railway.app/mcp
+
+metadata:
+  displayName: XMoment ($XMT)
+  description: |
+    Turn a viral tweet or moment into a tradeable Clanker coin on Base in one tap.
+    A goal, a tweet, a cast becomes a $TICKER people buy in its first minutes; the
+    creator earns 40% of trades, forever. Built as a Clanker v4 partner interface.
+
+    Tools (descriptor-only — a human signs every mint; nothing is auto-posted):
+      - mint_moment    — a Clanker v4 deploy DESCRIPTOR for a live moment
+      - mint_tweet     — tokenize a tweet on X into a deploy descriptor
+      - x_moment       — autonomous: a viral tweet -> coin + a publish-GATED reply draft
+                          that redirects to the coin (/m/x:id). A human approves + posts.
+      - boost_quote    — x402 paywall config for a tier
+      - moment_timebox — app-level live/featured/closed state of a coin
+      - trending       — the current trending moment-coins feed
+
+    CORS-enabled streamable-http at /mcp so any autonomous agent can call it. No tool
+    signs, deploys, moves funds, or posts. Revenue is the Clanker recipients[] fee slot.
+  homepage: https://momentmint-production.up.railway.app
+  repository: https://github.com/philpof102-svg/xmoment
+  license: MIT
+  author: Phil
+  keywords:
+    - base
+    - clanker
+    - memecoin
+    - tweet
+    - moments
+    - x402
+    - mcp
+    - agent
+  categories:
+    - finance
+    - social
+
+  examples:
+    - name: Coin a viral tweet (autonomous draft, publish-gated)
+      input:
+        tool: x_moment
+        args:
+          tweet:
+            id: "1900"
+            text: "GOAL! Mbappe with a golazo in the World Cup final"
+            authorHandle: "FabrizioRomano"
+            likes: 90000
+            retweets: 25000
+          creator: "0xab...the signer"
+          interfaceFeeRecipient: "0xAC3ca7c5d3cDD7702fd08F9C4C28dAA22296aDa9"
+      output:
+        action:
+          ticker: "GOALMBAPPE"
+          link: "https://momentmint-production.up.railway.app/m/x:1900"
+          reply: "coined this moment as $GOALMBAPPE on Base ..."
+          publish:
+            autoPosted: false
+
+icon: https://momentmint-production.up.railway.app/icon.png

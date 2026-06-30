@@ -1,0 +1,43 @@
+{
+  "$schema": "https://eips.ethereum.org/EIPS/eip-8004#agent-card",
+  "name": "XMoment",
+  "description": "Turn a viral tweet or moment into a tradeable Clanker coin on Base ($XMT). Descriptor-only — a human signs every mint. Exposes an MCP (streamable-http, CORS-enabled) so autonomous agents can coin the moment and draft a reply that redirects to the coin.",
+  "url": "https://momentmint-production.up.railway.app",
+  "version": "0.1.0",
+  "mcp": {
+    "endpoint": "https://momentmint-production.up.railway.app/mcp",
+    "transport": "streamable-http",
+    "protocolVersion": "2024-11-05"
+  },
+  "skills": [
+    {
+      "id": "coin-a-tweet",
+      "primary": true,
+      "name": "Coin a viral tweet ($XMT moment coin)",
+      "description": "Turn an X tweet into a tradeable Clanker coin on Base plus a reply that redirects to it (/m/x:id). Returns an UNSIGNED deploy descriptor (a human signs) and a publish-GATED reply draft (a human posts).",
+      "endpoint": "https://momentmint-production.up.railway.app/api/x-moment",
+      "method": "POST",
+      "tags": ["base", "clanker", "memecoin", "tweet", "x402", "moments"]
+    },
+    {
+      "id": "mint-moment",
+      "name": "Coin any live moment",
+      "description": "Turn a live moment (goal, drop, cast) into a Clanker v4 deploy descriptor. Descriptor-only; a human signs.",
+      "endpoint": "https://momentmint-production.up.railway.app/api/mint-moment",
+      "method": "POST",
+      "tags": ["base", "clanker", "moments"]
+    }
+  ],
+  "operator": {
+    "address": "0xAC3ca7c5d3cDD7702fd08F9C4C28dAA22296aDa9",
+    "chain": "eip155:8453",
+    "basescan": "https://basescan.org/address/0xAC3ca7c5d3cDD7702fd08F9C4C28dAA22296aDa9"
+  },
+  "safety": {
+    "descriptorOnly": true,
+    "signsFunds": false,
+    "autoPosts": false,
+    "note": "No tool signs, deploys, moves funds, or posts. The calling agent's user signs the mint; the agent posts its own replies under its own account and ToS responsibility."
+  },
+  "contact": { "url": "https://momentmint-production.up.railway.app" }
+}
