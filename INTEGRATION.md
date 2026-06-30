@@ -30,8 +30,11 @@ XMoment 5000 bps = **40%**, Clanker **20%**. There is **NO separate interface/re
 is clanker.world social-provenance only; XMoment's revenue is SOLELY its `recipients[]` slot.
 
 ## ⚠️ Remaining verification (needs a REAL Farcaster client + a funded wallet — can't be done from a plain browser)
-1. Confirm the esm.sh CDN imports of `clanker-sdk/v4` + `viem` resolve inside the Farcaster mini-app webview
-   (if not, vendor a small bundled build instead of CDN imports).
+1. ✓ RESOLVED (2026-06-30): the 3 separate esm.sh CDN imports failed live ("could not load the mint SDK"). The mint
+   now loads a VENDORED same-origin bundle `public/vendor/xmoment-mint.mjs` (clanker-sdk@4.2.16/v4 + viem + viem/chains,
+   esbuild browser target, ~800KB) — deterministic, no CDN graph; pinned esm.sh kept as a fallback; `.mjs` MIME added.
+   To re-bundle after a clanker-sdk bump: `npm i clanker-sdk@<v> viem esbuild` + esbuild `mint-entry.mjs` (re-exports
+   Clanker + createPublicClient/createWalletClient/http/custom/base) → `public/vendor/xmoment-mint.mjs`.
 2. Do ONE real deploy in Farcaster → confirm the token mints, the pool is created, and the **XMoment address
    actually receives its 40% fee share** at the grounded config (no tuning expected — just verify the on-chain
    accrual matches the 40/40/20 math; if Clanker's protocol cut or default differs in practice, reconcile then).

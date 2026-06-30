@@ -269,11 +269,24 @@ async function connectWallet(){
 // REAL on-chain mint via clanker-sdk v4 (grounded on clanker.gitbook.io/sdk/v4.0.0). The USER signs with their
 // Farcaster wallet — the app never holds a key. Runs ONLY when a wallet is present (gated in coinIt); a plain
 // browser stays in descriptor-preview demo. ⚠️ Needs final testing in a real Farcaster client + funded wallet.
+// Load the mint SDK as a CLASSIC <script> (window.XMint) — sidesteps dynamic-import() "failed to fetch module" that some browsers/extensions hit.
+let _xmintP=null;
+function loadXMint(){
+  if(window.XMint) return Promise.resolve(window.XMint);
+  if(_xmintP) return _xmintP;
+  _xmintP = new Promise((resolve,reject)=>{
+    const s=document.createElement('script'); s.src='/vendor/xmoment-mint.js'; s.async=true;
+    s.onload=()=> window.XMint ? resolve(window.XMint) : reject(new Error('mint bundle loaded but XMint missing'));
+    s.onerror=()=> reject(new Error('failed to load /vendor/xmoment-mint.js'));
+    document.head.appendChild(s);
+  });
+  return _xmintP;
+}
 async function mintOnChain(descriptor){           // consume the GROUNDED + validated backend descriptor; the USER signs
   if(!descriptor || !descriptor.params) throw new Error('no mint plan from server — try again');
   let mod;
-  try{ mod = await import('/vendor/xmoment-mint.mjs'); }   // same-origin bundle (clanker-sdk v4 + viem) — deterministic, no esm.sh graph
-  catch(e1){                                               // fallback: pinned esm.sh (only if the bundle is missing)
+  try{ mod = await loadXMint(); }                         // classic <script> bundle — no dynamic-import quirks
+  catch(e1){                                               // fallback: pinned esm.sh module imports
     try{ const m = await Promise.all([ import('https://esm.sh/clanker-sdk@4.2.16/v4'), import('https://esm.sh/viem@2'), import('https://esm.sh/viem@2/chains') ]);
       mod = { Clanker:m[0].Clanker, createPublicClient:m[1].createPublicClient, createWalletClient:m[1].createWalletClient, http:m[1].http, custom:m[1].custom, base:m[2].base }; }
     catch(e2){ console.error('[xmoment] mint SDK load failed', e1, e2); throw new Error('could not load the mint SDK: ' + String((e1&&e1.message)||e1)); }
