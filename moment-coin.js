@@ -47,24 +47,29 @@ function buildMomentCoin(moment, opts = {}) {
   };
 }
 
-/** The Clanker v4 partner-interface deploy DESCRIPTOR (not executed). */
+/** The Clanker v4 deploy DESCRIPTOR (not executed) — grounded on the real SDK call.
+ *  Clanker takes a fixed 20% of fees; the remaining 80% splits across rewards.recipients[] by bps (total 10000).
+ *  To land interface 40% + creator 40% of TOTAL fees, each recipient gets 5000 bps (= 50% of the 80% pool). */
 function clankerDeployDescriptor(spec) {
   if (!spec || !spec.fees || !isAddr(spec.fees.interfaceRecipient)) throw new Error('invalid spec (build it with buildMomentCoin)');
+  const recipients = [
+    { recipient: spec.fees.creatorRecipient, admin: spec.fees.creatorRecipient, bps: 5000, token: 'Both' }, // creator → 40% of total
+    { recipient: spec.fees.interfaceRecipient, admin: spec.fees.interfaceRecipient, bps: 5000, token: 'Both' }, // MomentMint, the partner-interface slot → 40% of total
+  ];
   return {
     rail: 'clanker-v4',
-    action: 'deployToken',
+    sdkCall: 'deployWithTokenizedFees',             // PoolFans / Clanker v4 SDK (grounded via pool.fans/docs, 2026-06-30)
     params: {
       name: spec.name, symbol: spec.ticker, image: spec.image,
-      memo: spec.momentRef,                         // binds the coin to its moment (cheap on-chain memo)
-      // single-sided Uniswap-v4 LP is created by Clanker; we deploy AS the partner interface to hold the 40% slot:
-      interfaceAdmin: spec.fees.interfaceRecipient,
-      rewardRecipients: { interface: spec.fees.interfaceRecipient, creator: spec.fees.creatorRecipient },
+      tokenAdmin: spec.fees.creatorRecipient,       // the creator owns/admins their moment coin
+      rewards: { recipients },                       // bps split = the fee mechanism (our address = the interface slot)
+      memo: spec.momentRef,                          // bind the coin to its moment
     },
-    feeSplit: { interfacePct: spec.fees.interfacePct, creatorPct: spec.fees.creatorPct, clankerPct: spec.fees.clankerPct, swapFeeBps: spec.fees.feeBps },
+    feeSplit: { interfacePct: spec.fees.interfacePct, creatorPct: spec.fees.creatorPct, clankerPct: spec.fees.clankerPct, recipientsBps: '5000/5000 of the 80% post-Clanker pool', swapFeeBps: spec.fees.feeBps },
     chain: 'base',
     signed: false,
     execution: EXEC,
-    sdkBinding: 'Clanker v4 SDK — CONFIRM exact deploy call + partner-fee-slot at clanker.gitbook.io / pool.fans/docs before live (P1).',
+    grounding: 'deployWithTokenizedFees(recipients[].bps) confirmed via pool.fans/docs 2026-06-30. P1: a human/relayer runs the SDK call; still confirm whether a separate interface-referrer bonus exists atop recipients[].',
   };
 }
 
@@ -107,8 +112,8 @@ if (require.main === module) {
     ['spec: ticker auto-derived + name kept', spec.ticker === 'MBAPPGOAL7' && spec.name === "Mbappé Goal 71'"],
     ['spec: live window + moment ref (memo) bound', spec.liveWindow.startSec === 1782000000 && spec.momentRef === 'wc:fra-bra:71'],
     ['fee split is the partner-interface 40/40/20 of Clanker 0.20%', spec.fees.interfacePct === 40 && spec.fees.creatorPct === 40 && spec.fees.clankerPct === 20 && spec.fees.feeBps === 20],
-    ['descriptor targets clanker-v4 + holds OUR interface slot (the 40%)', desc.rail === 'clanker-v4' && desc.params.interfaceAdmin === PLATFORM && desc.feeSplit.interfacePct === 40],
-    ['descriptor flags the SDK grounding TODO (no fabricated call)', /clanker\.gitbook|pool\.fans/.test(desc.sdkBinding)],
+    ['descriptor uses the grounded Clanker v4 call + puts OUR address in recipients at 5000 bps (the 40% slot)', desc.rail === 'clanker-v4' && desc.sdkCall === 'deployWithTokenizedFees' && desc.params.rewards.recipients.some(r => r.recipient === PLATFORM && r.bps === 5000) && desc.feeSplit.interfacePct === 40],
+    ['descriptor is grounded on the real SDK (no fabricated call)', /deployWithTokenizedFees/.test(desc.sdkCall) && /pool\.fans/.test(desc.grounding)],
     ['DESCRIPTOR-ONLY: signed:false + execution FORBIDDEN', desc.signed === false && /FORBIDDEN/.test(desc.execution)],
     ['time-box live mid-window → featured + boostable', live.status === 'live' && live.featured === true && live.boostable === true],
     ['time-box after end → closed, NOT featured, NOT boostable (app-level honesty)', closed.status === 'closed' && closed.featured === false && closed.boostable === false],

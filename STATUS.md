@@ -18,8 +18,11 @@ Coin the moment in one tap, on Base via **Clanker**. See `CONCEPT.md`. NEW stand
 - **`moment-coin.js`** (12/12) — `buildMomentCoin` (validated spec) + `clankerDeployDescriptor` (partner-interface
   40/40/20 of Clanker's 0.2%) + `momentTimeBox` (app-level live/featured/closed honesty). Descriptor-only.
 ### Next (P1)
-- **GROUND** the Clanker v4 SDK deploy call + partner-fee-slot (clanker.gitbook.io / pool.fans/docs) — confirm the
-  40% interface split applies to programmatic deploys. Then a **HUMAN-signed test deploy** of one moment-coin on Base.
+- ✅ **Clanker v4 deploy call GROUNDED** (pool.fans/docs): `deployWithTokenizedFees({name,symbol,image,tokenAdmin,
+  rewards:{recipients:[{recipient,admin,bps,token}]}})`. Fee split = `recipients[].bps` (Clanker auto-takes 20%; 80%
+  split by bps). Our address at **5000 bps = the 40% interface slot**; creator 5000 bps = 40%. Descriptor emits this.
+- **Remaining P1: a HUMAN-signed test deploy** of one moment-coin on Base (needs Phil's relayer key + gas) + confirm
+  whether a separate "interface-referrer" bonus exists atop `recipients[]`.
 
 ## Open questions for Phil (from the workflow)
 relayer key holder + gas funding · flat mint-fee level ($0.49 vs lower) · IP appetite (named players/teams vs generic) ·
