@@ -25,7 +25,7 @@ const { coinSharePage, coinOgSvg, farcasterManifest, appIconSvg } = require('./f
 const { xMomentAction, runOnce } = require('./x-agent');
 
 const ROOT = path.join(__dirname, 'public');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon' };
 
 // Persistent trending feed (store.js — JSON-file, de-duped). Seeded once; /api/trending + the MCP
 // `trending` tool read the store. /api/record adds a coin (for the confirmed-mint flow, relayer-gated).

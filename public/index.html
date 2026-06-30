@@ -271,17 +271,16 @@ async function connectWallet(){
 // browser stays in descriptor-preview demo. ⚠️ Needs final testing in a real Farcaster client + funded wallet.
 async function mintOnChain(descriptor){           // consume the GROUNDED + validated backend descriptor; the USER signs
   if(!descriptor || !descriptor.params) throw new Error('no mint plan from server — try again');
-  let Clanker, viem, base;
-  try{                                            // load the mint SDK from the CDN; surface a clear error if it can't
-    const m = await Promise.all([
-      import('https://esm.sh/clanker-sdk/v4'),
-      import('https://esm.sh/viem'),
-      import('https://esm.sh/viem/chains'),
-    ]);
-    Clanker = m[0].Clanker; viem = m[1]; base = m[2].base;
-  }catch(e){ throw new Error('could not load the mint SDK — check connection and reload'); }
-  const publicClient = viem.createPublicClient({ chain: base, transport: viem.http() });
-  const walletClient = viem.createWalletClient({ account: wallet, chain: base, transport: viem.custom(walletProvider) });
+  let mod;
+  try{ mod = await import('/vendor/xmoment-mint.mjs'); }   // same-origin bundle (clanker-sdk v4 + viem) — deterministic, no esm.sh graph
+  catch(e1){                                               // fallback: pinned esm.sh (only if the bundle is missing)
+    try{ const m = await Promise.all([ import('https://esm.sh/clanker-sdk@4.2.16/v4'), import('https://esm.sh/viem@2'), import('https://esm.sh/viem@2/chains') ]);
+      mod = { Clanker:m[0].Clanker, createPublicClient:m[1].createPublicClient, createWalletClient:m[1].createWalletClient, http:m[1].http, custom:m[1].custom, base:m[2].base }; }
+    catch(e2){ console.error('[xmoment] mint SDK load failed', e1, e2); throw new Error('could not load the mint SDK: ' + String((e1&&e1.message)||e1)); }
+  }
+  const { Clanker, createPublicClient, createWalletClient, http, custom, base } = mod;
+  const publicClient = createPublicClient({ chain: base, transport: http() });
+  const walletClient = createWalletClient({ account: wallet, chain: base, transport: custom(walletProvider) });
   const clanker = new Clanker({ publicClient, wallet: walletClient });
   const p = descriptor.params;                      // name/symbol/image/rewards/fees(static 1%)/context — all grounded server-side
   // the server uses the platform addr as a placeholder for both slots; swap recipients[0] (creator) to the signer
