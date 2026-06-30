@@ -3,6 +3,11 @@
 Coin the moment in one tap, on Base via **Clanker**. See `CONCEPT.md`. NEW standalone repo, started 2026-06-30
 (ultracode workflow v2 winner; Phil: ethics **GO** "ship with honesty" + stack = **Clanker/Base**, not raw B20).
 
+## 🚀 LIVE: https://momentmint-production.up.railway.app
+Own Railway project `momentmint` (workspace "phil pof's Projects"). Serves the UI + `/api/mint-moment` /
+`/api/mint-tweet` / `/api/boost` / `/api/trending` (descriptor-only) + `/mcp` (5 agent tools) + `/health`.
+**App shell is LIVE; on-chain minting awaits Phil's relayer + the gates.** Verified end-to-end 2026-06-30.
+
 ## Control plane (read FIRST)
 - **North-Star:** the trending mass behavior — tap-to-coin / one-tap-buy a *moment* — monetized as a **Clanker
   partner interface** (40% of the 0.2% swap fee, forever). NOT a verification/trust product (that's dead).
@@ -48,6 +53,7 @@ relayer key holder + gas funding · flat mint-fee level ($0.49 vs lower) · IP a
 _Last write: 2026-06-30 — 4 modules, 37/37: `moment-coin` (Clanker v4 deploy GROUNDED) + `tweet-moment`
 (tokenize a tweet on X) + `boost-paywall` (x402 flat fee) + `mcp-server` (read-only/descriptor-only MCP tools:
 mint_moment / mint_tweet / boost_quote / moment_timebox / trending). All descriptor-only. Stack = Clanker partner
-interface on Base. Ethics GO. **UI mock shipped** (public/index.html, mobile-first, syntax-clean). Next: wire the
-real Clanker v4 deploy + the x402 boost server + the Farcaster Frame endpoints + a sqlite trending store. Live
-test-deploy needs Phil's relayer key + the 4 gates (relayer/gas · mint-fee level · IP appetite · 14-day kill number)._
+interface on Base. Ethics GO. **DEPLOYED LIVE** at momentmint-production.up.railway.app — `app.js` (7/7) serves UI +
+descriptor APIs + `/mcp` + `/health`; summery Kalshi/Polymarket UI (public/index.html, screenshotted); 44/44 across 5
+suites. Next: real on-chain minting (needs Phil's relayer + gates), Farcaster Frame endpoints, sqlite trending store.
+**Gates pending Phil for live minting: relayer key + gas · mint-fee level ($0.49 vs lower) · IP appetite (named vs generic).**_
