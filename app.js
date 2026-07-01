@@ -22,7 +22,7 @@ const { boostPaywall } = require('./boost-paywall');
 const { dispatch, SERVER, TOOLS } = require('./mcp-server');
 const { createStore } = require('./store');
 const { coinSharePage, coinOgSvg, farcasterManifest, appIconSvg, queuePage } = require('./frame');
-const { xMomentAction, runOnce, fetchTrending } = require('./x-agent');
+const { xMomentAction, runOnce, fetchTrending, pushToTypefully } = require('./x-agent');
 
 const ROOT = path.join(__dirname, 'public');
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon' };
@@ -188,6 +188,15 @@ if (require.main === module) {
         try {
           const picks = await fetchTrending({ appUrl: selfUrl, creator: PLATFORM, interfaceFeeRecipient: PLATFORM, trend: process.env.BOT_TREND || 'football', source: useGrok ? 'grok' : undefined, bearerToken: process.env.X_BEARER_TOKEN, apiKey: process.env.XAI_API_KEY, limit: 5 });
           picks.forEach((p) => store.queueDraft({ tweetId: p.action.tweetId, ticker: p.action.ticker, coinRef: p.action.coinRef, link: p.action.link, reply: p.action.reply, score: p.score }));
+          // AUTHORIZED auto-post via Typefully (Phil), with account-protecting rails: own-timeline announcement,
+          // capped at BOT_POST_MAX/cycle (default 1), Typefully SCHEDULES it (paced, not a spam-reply). No Typefully key → queue only.
+          if (process.env.TYPEFULLY_API_KEY) {
+            const max = Math.max(0, Number(process.env.BOT_POST_MAX) || 1);
+            for (const p of picks.slice(0, max)) {
+              try { await pushToTypefully(p.action.post, { apiKey: process.env.TYPEFULLY_API_KEY }); console.log('[xmoment bot] scheduled $' + p.action.ticker + ' via Typefully'); }
+              catch (e) { console.log('[xmoment bot] Typefully error: ' + e.message); }
+            }
+          }
           if (picks.length) console.log('[xmoment bot] queued ' + picks.length + ' draft(s) → /queue');
         } catch (e) { console.log('[xmoment bot] cycle error: ' + e.message); }
       };

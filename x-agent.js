@@ -62,10 +62,11 @@ function xMomentAction(tweet, opts = {}) {
   const link = appUrl + '/m/' + encodeURIComponent(ref);             // the per-tweet redirect -> that coin's share page
   const tk = coin.spec.ticker;
   const reply = `coined this moment as $${tk} on Base — grab it while it's live 👉 ${link}\ncreator earns 40% of trades · speculative, not advice · not affiliated or endorsed`;
+  const post = `☀ ${coin.spec.name} is now a coin on Base — $${tk} 👉 ${link}\ntrade the moment while it's live · speculative, not advice`;
   return {
     tweetId: coin.attribution.tweetId, author: coin.attribution.authorHandle,
     coinRef: ref, ticker: tk, link,
-    reply,                                                           // the text to post UNDER the tweet (DRAFT)
+    reply, post,                                                    // reply = under the tweet; post = own-timeline announcement (both DRAFTS)
     descriptor: coin.descriptor,                                    // descriptor-only — a human signs the mint
     publish: {
       autoPosted: false, channel: opts.channel || 'manual-review',  // GATED — never auto-posts
@@ -125,7 +126,22 @@ async function fetchTrending(opts = {}) {
   return selectTrending(candidates, opts).map((p) => ({ score: p.score, reasons: p.reasons, action: xMomentAction(p.tweet, opts) }));
 }
 
-module.exports = { scoreTweet, selectTrending, xMomentAction, runOnce, fetchXSearch, fetchGrok, fetchTrending, TRENDS };
+/** push a post to Typefully → it SCHEDULES it (auto-publishes at the next free slot). The account's own posting tool;
+ *  paced by Typefully's queue (not a spam-reply). Needs a Typefully API key. Phil AUTHORIZED auto-posting via Typefully. */
+async function pushToTypefully(text, opts = {}) {
+  const fetchImpl = opts.fetch || (typeof fetch !== 'undefined' ? fetch : null);
+  if (!fetchImpl) throw new Error('no fetch available');
+  if (!opts.apiKey) throw new Error('TYPEFULLY_API_KEY required to post');
+  if (!text || !String(text).trim()) throw new Error('empty post');
+  const r = await fetchImpl('https://api.typefully.com/v1/drafts/', {
+    method: 'POST', headers: { 'content-type': 'application/json', 'X-API-KEY': opts.apiKey },
+    body: JSON.stringify({ content: String(text), 'schedule-date': opts.scheduleDate || 'next-free-slot', threadify: false, share: false }),
+  });
+  if (!r.ok) throw new Error('Typefully HTTP ' + r.status);
+  return await r.json();
+}
+
+module.exports = { scoreTweet, selectTrending, xMomentAction, runOnce, fetchXSearch, fetchGrok, fetchTrending, pushToTypefully, TRENDS };
 
 // ---- SELF-TEST (the checker) ---------------------------------------------
 if (require.main === module) (async () => {
@@ -151,6 +167,9 @@ if (require.main === module) (async () => {
   const gk = await fetchGrok('trending football', { fetch: mockGrok, apiKey: 'key' });
   const liveX = await fetchTrending({ source: 'xsearch', trend: 'football', fetch: mockX, bearerToken: 'tok', creator: CREATOR, interfaceFeeRecipient: PLATFORM });
   let threwNoKey = false; try { await fetchXSearch('x', { fetch: mockX }); } catch (e) { threwNoKey = true; }
+  const mockTf = async () => ({ ok: true, json: async () => ({ id: 555, share_url: 'https://typefully.com/t/x' }) });
+  const tf = await pushToTypefully('☀ $ABC on Base', { fetch: mockTf, apiKey: 'k' });
+  let tfNoKey = false; try { await pushToTypefully('x', { fetch: mockTf }); } catch (e) { tfNoKey = true; }
 
   const checks = [
     ['scoreTweet: a viral football tweet scores high (trend + virality + source)', sFoot.score >= 70 && sFoot.reasons.some(r => r.startsWith('trend:')) && sFoot.reasons.some(r => r.startsWith('virality:'))],
@@ -168,6 +187,9 @@ if (require.main === module) (async () => {
     ['fetchGrok: parses Grok JSON -> candidate tweets (real ids)', gk.length === 1 && gk[0].id === '888' && gk[0].authorHandle === 'elonmusk'],
     ['fetchTrending: LIVE source -> scored picks -> coin actions (descriptor-only, gated)', liveX.length === 1 && liveX[0].action.descriptor.signed === false && liveX[0].action.publish.autoPosted === false],
     ['live fetch REQUIRES credentials (no bearer/key -> throws, never fabricates)', threwNoKey === true],
+    ['xMomentAction has an own-timeline post announcement (distinct from the reply)', action.post && action.post.includes('$' + action.ticker) && action.post.includes(action.link) && action.post !== action.reply],
+    ['pushToTypefully posts (Typefully SCHEDULES it; needs a key)', tf && tf.id === 555],
+    ['pushToTypefully REQUIRES the Typefully key (no key -> throws)', tfNoKey === true],
   ];
   console.log('top pick:', JSON.stringify({ score: picksFoot[0] && picksFoot[0].score, ticker: action.ticker, link: action.link }));
   console.log('reply draft:', JSON.stringify(action.reply));
