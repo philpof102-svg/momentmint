@@ -56,13 +56,15 @@ const body = (req) => new Promise((r) => { let b = ''; req.on('data', (c) => { b
 
 // DOGFOOD: enrich real-addr coins with LIVE market data from our own xsignal ingredient (best-effort, 60s cache).
 const XSIGNAL_URL = (process.env.XSIGNAL_URL || 'https://xsignal-production.up.railway.app').replace(/\/$/, '');
+const XSIGNAL_WALLET = process.env.XSIGNAL_WALLET || '0xAC3ca7c5d3cDD7702fd08F9C4C28dAA22296aDa9'; // probe wallet (3 free/wallet). The x402-PAID dogfood loop (a real settlement → xsignal listed on the Bazaar) fires when Phil sets a funded payer + xsignal is on mainnet.
 const _mkt = new Map(); // addr → { at, data }
 async function marketFor(addr) {
   if (!/^0x[a-fA-F0-9]{40}$/.test(String(addr || ''))) return null;
   const c = _mkt.get(addr), now = Date.now();
   if (c && now - c.at < 60000) return c.data;
   try {
-    const r = await fetch(XSIGNAL_URL + '/token/preview?addr=' + addr);
+    // DOGFOOD: XMoment consumes xsignal's token intel (xsignal has no free tier now → use the 3-per-wallet probe).
+    const r = await fetch(XSIGNAL_URL + '/token?addr=' + addr + '&wallet=' + XSIGNAL_WALLET);
     const t = r.ok ? await r.json() : null;
     const data = (t && t.priceUsd != null) ? { pr: '$' + t.priceUsd, liqUsd: t.liquidityUsd, flags: t.flags } : null;
     _mkt.set(addr, { at: now, data });
