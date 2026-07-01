@@ -141,7 +141,21 @@ async function pushToTypefully(text, opts = {}) {
   return await r.json();
 }
 
-module.exports = { scoreTweet, selectTrending, xMomentAction, runOnce, fetchXSearch, fetchGrok, fetchTrending, pushToTypefully, TRENDS };
+/** DOGFOOD: pull a ranked + cited signal from our own xsignal ingredient (the free preview tier by default).
+ *  Returns candidate stubs {author,url,score} — the "what's hot" input. Full text/metrics need the x402-paid /signal
+ *  (facilitator required). This makes XMoment a real CONSUMER of xsignal (see [[xsignal]]). `fetch` injectable. */
+async function fetchFromXsignal(query, opts = {}) {
+  const fetchImpl = opts.fetch || (typeof fetch !== 'undefined' ? fetch : null);
+  if (!fetchImpl) throw new Error('no fetch available');
+  const base = (opts.xsignalUrl || 'https://xsignal-production.up.railway.app').replace(/\/$/, '');
+  const path = opts.paid ? '/signal' : '/signal/preview';
+  const r = await fetchImpl(base + path + '?q=' + encodeURIComponent(query || 'base'), opts.paymentHeader ? { headers: { 'x-payment': opts.paymentHeader } } : {});
+  if (!r.ok) throw new Error('xsignal HTTP ' + r.status);
+  const j = await r.json();
+  return (j.items || []).map((i) => ({ id: i.url, text: i.text, author: i.author, url: i.url, score: i.score }));
+}
+
+module.exports = { scoreTweet, selectTrending, xMomentAction, runOnce, fetchXSearch, fetchGrok, fetchTrending, fetchFromXsignal, pushToTypefully, TRENDS };
 
 // ---- SELF-TEST (the checker) ---------------------------------------------
 if (require.main === module) (async () => {
@@ -170,6 +184,8 @@ if (require.main === module) (async () => {
   const mockTf = async () => ({ ok: true, json: async () => ({ id: 555, share_url: 'https://typefully.com/t/x' }) });
   const tf = await pushToTypefully('☀ $ABC on Base', { fetch: mockTf, apiKey: 'k' });
   let tfNoKey = false; try { await pushToTypefully('x', { fetch: mockTf }); } catch (e) { tfNoKey = true; }
+  const mockXsig = async () => ({ ok: true, json: async () => ({ items: [{ author: 'a', url: 'https://x.com/i/status/1', score: 88, text: 'ETH ripping' }] }) });
+  const xsig = await fetchFromXsignal('eth', { fetch: mockXsig });
 
   const checks = [
     ['scoreTweet: a viral football tweet scores high (trend + virality + source)', sFoot.score >= 70 && sFoot.reasons.some(r => r.startsWith('trend:')) && sFoot.reasons.some(r => r.startsWith('virality:'))],
@@ -190,6 +206,7 @@ if (require.main === module) (async () => {
     ['xMomentAction has an own-timeline post announcement (distinct from the reply)', action.post && action.post.includes('$' + action.ticker) && action.post.includes(action.link) && action.post !== action.reply],
     ['pushToTypefully posts (Typefully SCHEDULES it; needs a key)', tf && tf.id === 555],
     ['pushToTypefully REQUIRES the Typefully key (no key -> throws)', tfNoKey === true],
+    ['fetchFromXsignal: DOGFOODS our xsignal ingredient → ranked + cited items', xsig.length === 1 && xsig[0].url === 'https://x.com/i/status/1' && xsig[0].score === 88],
   ];
   console.log('top pick:', JSON.stringify({ score: picksFoot[0] && picksFoot[0].score, ticker: action.ticker, link: action.link }));
   console.log('reply draft:', JSON.stringify(action.reply));
