@@ -105,7 +105,8 @@ function createServer() {
         const str = (s, n) => typeof s === 'string' ? s.replace(/[<>]/g, '').slice(0, n) : undefined; // strip angle brackets + cap length
         const rec = { tk: str(a.tk, 24), ref: str(a.ref, 120), nm: str(a.nm, 80), em: str(a.em, 16), kind: str(a.kind, 24),
           creator: str(a.creator, 60), pr: str(a.pr, 16), ch: str(a.ch, 16),
-          endSec: Number.isFinite(+a.endSec) ? Math.floor(+a.endSec) : undefined, up: a.up === undefined ? undefined : !!a.up };
+          endSec: Number.isFinite(+a.endSec) ? Math.floor(+a.endSec) : undefined, up: a.up === undefined ? undefined : !!a.up,
+          addr: (typeof a.addr === 'string' && /^0x[a-fA-F0-9]{40}$/.test(a.addr)) ? a.addr : undefined }; // the deployed token addr → makes the coin tradeable
         Object.keys(rec).forEach(k => rec[k] === undefined && delete rec[k]); // keep store defaults (pr/ch/up) when caller omits them
         if (!rec.tk || !rec.ref) return json(res, 400, { error: 'tk + ref required' });
         store.record(rec); // whitelisted fields only — never persist closed/recordedSec/scripts from the client

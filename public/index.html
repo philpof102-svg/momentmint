@@ -180,13 +180,13 @@
     <div class="pane on" data-pane="match">
       <div class="lab">World Cup · live now — tap a moment</div>
       <div class="chips" id="chips">
-        <div class="chip" data-nm="Mbappé 71'" data-tk="MBAPPE71" data-em="⚽" data-secs="540">
+        <div class="chip" data-nm="Mbappé 71'" data-tk="MBAPPE71" data-em="⚽" data-secs="86400">
           <span class="tag goal">GOAL</span><div class="flag">🇫🇷</div><div class="ttl">Mbappé 71'</div><div class="meta">FRA 2–1 BRA · just now</div></div>
-        <div class="chip" data-nm="Brazil Out" data-tk="BRAOUT" data-em="😱" data-secs="900">
+        <div class="chip" data-nm="Brazil Out" data-tk="BRAOUT" data-em="😱" data-secs="86400">
           <span class="tag upset">UPSET</span><div class="flag">🇧🇷</div><div class="ttl">Brazil Out</div><div class="meta">round of 16 · shock</div></div>
-        <div class="chip" data-nm="Yamal Worldie" data-tk="YAMAL" data-em="🔥" data-secs="720">
+        <div class="chip" data-nm="Yamal Worldie" data-tk="YAMAL" data-em="🔥" data-secs="86400">
           <span class="tag goal">GOAL</span><div class="flag">🇪🇸</div><div class="ttl">Yamal 🚀</div><div class="meta">ESP · 35-yd screamer</div></div>
-        <div class="chip" data-nm="USA Penalty" data-tk="USAPEN" data-em="🎯" data-secs="300">
+        <div class="chip" data-nm="USA Penalty" data-tk="USAPEN" data-em="🎯" data-secs="86400">
           <span class="tag live">LIVE</span><div class="flag">🇺🇸</div><div class="ttl">USA Pen!</div><div class="meta">120' · sudden death</div></div>
       </div>
     </div>
@@ -318,7 +318,7 @@ document.getElementById('chips').addEventListener('click',e=>{const c=e.target.c
 function pasteTweet(){const v=document.getElementById('tweetin').value||'x.com/jessepollak/status/2069212188619805179';
   const h=(v.match(/(?:x|twitter)\.com\/([A-Za-z0-9_]{1,15})/)||[])[1]||'someone';
   preview({nm:'@'+h+' tweet',tk:('$'+h).slice(0,9).toUpperCase().replace('@',''),em:'🐦',secs:86400,by:'@'+h});}
-function pasteCast(){preview({nm:'a cast',tk:'CAST',em:'✦',secs:43200});}
+function pasteCast(){preview({nm:'a cast',tk:'CAST',em:'✦',secs:86400});}
 
 function preview(m){cur=m; timers.forEach(clearInterval); timers=[];
   document.getElementById('coinbtn').disabled=false;
@@ -331,7 +331,7 @@ function preview(m){cur=m; timers.forEach(clearInterval); timers=[];
     <div class="disc">closes at full-time — the coin still trades on-chain after, trade at your own risk. not investment advice.</div></div>`;
   startCd(document.getElementById('cd'),m.secs);}
 function startCd(el,secs){function tick(){if(secs<=0){el.textContent='CLOSED'; el.classList.add('warm'); return;}
-  const m=String(Math.floor(secs/60)).padStart(2,'0'),s=String(secs%60).padStart(2,'0'); el.textContent=m+':'+s; el.classList.toggle('warm',secs<120); secs--;}
+  const h=Math.floor(secs/3600), m=Math.floor((secs%3600)/60), ss=secs%60, p=n=>String(n).padStart(2,'0'); el.textContent=(h>0?p(h)+':':'')+p(m)+':'+p(ss); el.classList.toggle('warm',secs<120); secs--;}
   tick(); timers.push(setInterval(tick,1000));}
 
 async function coinIt(){ if(!cur)return;
@@ -353,7 +353,7 @@ async function coinIt(){ if(!cur)return;
   toast('●','Minting $'+cur.tk+' — confirm in your wallet…');   // the USER signs the real Clanker deploy on Base
   try{ mintedAddr=await mintOnChain(descriptor); }
   catch(e){ console.error('[momentmint mint]', e); toast('●','Mint failed — '+String(e&&e.message||e).slice(0,70)); return stop(); }
-  try{ await fetch('/api/record',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({nm:cur.nm,tk:cur.tk,em:cur.em,ref,endSec:endS})}); }catch(e){} // record only REAL coins → honest feed
+  try{ await fetch('/api/record',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({nm:cur.nm,tk:cur.tk,em:cur.em,ref,endSec:endS,addr:mintedAddr})}); }catch(e){} // record only REAL coins (+ token addr) → honest, tradeable feed
   toast('●','Live! $'+cur.tk+' minted '+String(mintedAddr).slice(0,8)+'…');
   curMinted=mintedAddr;
   const card=document.getElementById('card'); card.classList.add('flip');
@@ -362,7 +362,7 @@ async function coinIt(){ if(!cur)return;
       <div><div class="nm">${esc(cur.nm)}</div><div class="tk">$${esc(cur.tk)} · LIVE on Base</div></div></div>
       <div class="badges"><span class="bdg good">minted on-chain</span></div>
       <div class="disc">minted ${esc(String(mintedAddr).slice(0,10))}… — trades on Base via Clanker. closes when the moment ends; still trades on-chain after. speculative, not advice.</div>
-      <button class="share" onclick="shareCoin()">Share to earn 40% ↗</button>`;
+      <div class="trade"><button class="buy" onclick="buy()">Buy $${esc(cur.tk)} ↗</button><button class="share" onclick="shareCoin()">Share · earn 40% ↗</button></div>`;
     await loadTrending();
   },300);
   document.querySelectorAll('.chip').forEach(x=>x.classList.remove('sel'));}
@@ -373,10 +373,11 @@ async function shareCoin(){ if(!cur)return;
   try{ await navigator.clipboard.writeText(url); }catch(e){}
   try{ window.open('https://x.com/intent/tweet?text='+encodeURIComponent(text)+'&url='+encodeURIComponent(url),'_blank'); }catch(e){}
   toast('●','Link copied · share to spread your coin'); }
+function buy(addr){ const a=addr||curMinted; if(!a){ toast('●','coin it first, then buy'); return; } try{ window.open('https://dexscreener.com/base/'+a,'_blank'); }catch(e){} toast('●','Opening the live market on Base ↗'); }
 
 let feed=[];
-function feedRow(c){return `<div class="coinrow ${c.closed?'closed':''}"><div class="mini">${esc(c.em)}</div>
-  <div class="info"><div class="n">${esc(c.nm)}</div><div class="s">$${esc(c.tk)}${c.closed?' · moment ended':' · live'}</div></div>
+function feedRow(c){const a=(c.addr&&/^0x[a-fA-F0-9]{40}$/.test(c.addr))?c.addr:''; return `<div class="coinrow ${c.closed?'closed':''}"${a?` onclick="buy('${a}')" style="cursor:pointer"`:''}><div class="mini">${esc(c.em)}</div>
+  <div class="info"><div class="n">${esc(c.nm)}</div><div class="s">$${esc(c.tk)}${c.closed?' · moment ended':(a?' · live ↗':' · live')}</div></div>
   ${c.closed?'<span class="closedtag">Moment closed</span>':`<div class="stat"><div class="pr">${esc(c.pr)}</div><div class="ch"><span class="pill ${c.up?'up':'down'}">${esc(c.ch)}</span></div></div>`}</div>`;}
 function renderFeed(){document.getElementById('feed').innerHTML=feed.map(feedRow).join('')}
 function addToFeed(m){feed.unshift({nm:m.nm,tk:m.tk,em:m.em,pr:"$0.0008",ch:"new",up:true}); renderFeed();}
