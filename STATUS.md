@@ -1,70 +1,59 @@
-# XMoment — STATUS (loop reads FIRST, writes LAST)
+# XMoment ($XMT) — STATUS (loop reads FIRST, writes LAST)
 
-Coin the moment in one tap, on Base via **Clanker**. See `CONCEPT.md`. NEW standalone repo, started 2026-06-30
-(ultracode workflow v2 winner; Phil: ethics **GO** "ship with honesty" + stack = **Clanker/Base**, not raw B20).
+Coin the viral moment/tweet in one tap, on Base via **Clanker**. See `CONCEPT.md` / `README.md`. Standalone repo,
+started 2026-06-30 (ultracode workflow v2 winner). Renamed MomentMint → **XMoment** 2026-06-30. Ethics **GO** (ship honest).
 
-## 🚀 LIVE: https://momentmint-production.up.railway.app
-Own Railway project `momentmint` (workspace "phil pof's Projects"). Serves the UI + `/api/mint-moment` /
-`/api/mint-tweet` / `/api/boost` / `/api/trending` (descriptor-only) + `/mcp` (5 agent tools) + `/health` +
-`/m/:ref` + `/og/:ref.svg` + **`/.well-known/farcaster.json`** + `/icon.svg`. **App shell LIVE + verified e2e.**
-The UI calls the live backend (Coin it → `/api/mint-moment` → real Clanker descriptor → `/api/record` →
-`/api/trending`) and detects the **Farcaster Mini App wallet** (`@farcaster/miniapp-sdk`; graceful demo in a browser).
-
-**Gates RESOLVED (Phil 2026-06-30):** fees → the **MainStreet operator ADDRESS `0xAC3ca7c5…`** (public; the default
-`interfaceFeeRecipient` 40% slot + Boost `payTo`). The agent/server holds **NO private key** — the **CREATOR signs
-their own mint** (descriptor-only, one tap). Mint fee **$0.49**. **Named players OK** (IP = Phil's accepted call).
+## 🚀 LIVE: https://momentmint-production.up.railway.app  ·  🎉 FIRST REAL MINT LANDED (P1 gate cleared)
+Own Railway project `momentmint` (URL kept post-rename). **92/92 self-tests across 8 modules, all descriptor-only.**
+**On-chain PROVEN 2026-07-01:** tx `0xce5301aa…` → Clanker v4 `deployToken` → **$BRAOUT** at
+`0x48dC34b4E93A01C4307ECc45BF2452E40700118D` on Base (100B supply, Uniswap V4 pool vs WETH, ~$0.06 gas). The full
+UI → Clanker → on-chain pipeline works end-to-end.
 
 ## Control plane (read FIRST)
-- **North-Star:** the trending mass behavior — tap-to-coin / one-tap-buy a *moment* — monetized as a **Clanker
-  partner interface** (40% of TOTAL trade fees on a 1% swap fee, forever). NOT a verification/trust product (that's dead).
-- `loop-paused: false`.
-- **Readiness: L0→L1.** Builds + serves deploy descriptors only; nothing touches the chain yet (a human signs).
+- **North-Star:** tap-to-coin a viral moment/tweet → a tradeable Clanker coin; monetized as a **Clanker partner interface**
+  (40% of TOTAL trade fees on a 1% swap fee, forever). NON-verification (that pivot is dead).
+- `loop-paused: false`. **Readiness: L2 (on-chain proven).**
 
 ## Hard brakes
-- **DESCRIPTOR-ONLY. NEVER auto-signs / deploys / moves funds.** A HUMAN/relayer signs every Clanker deploy + buy.
-- No "verified/safe" claims — honesty is an **app-level time-box**, not a contract freeze. `x-ms-monitor:1` on internal curls.
+- **DESCRIPTOR-ONLY. The server/agent NEVER signs / deploys / moves funds / auto-posts.** The USER signs every mint;
+  a HUMAN posts every reply. No "verified/safe" claims — honesty is an app-level time-box, not a contract freeze.
 
-## Modules — Done (69/69 self-tests across 7 modules, all descriptor-only). HARDENED + fee-GROUNDED + manifest BUILT 2026-06-30.
-- **`moment-coin.js`** (13/13) — `buildMomentCoin` + `clankerDeployDescriptor` (grounded Clanker v4 **`deploy()`**; owns
-  **fees**(static 1%/100bps) + **context**, validates recipients bps = 10000, partner-interface 40/40/20) + `momentTimeBox`.
-- **`tweet-moment.js`** (8/8) — tokenize a TWEET on X: `parseTweetUrl` + `tweetMoment` → a `kind:'tweet'` coin (ref
-  `x:<id>`, 24h hype window, attribution + IP/consent note). Ingest via X oEmbed / X MCP / Chrome. Reuses the engine.
-- **`boost-paywall.js`** (9/9) — flat USDC fee (free / mint $0.49 / boost $1.50) via x402-v2, single payTo, a deliverable.
-- **`mcp-server.js`** (8/8) — READ-ONLY/descriptor-only MCP tools (mint_moment / mint_tweet / boost_quote / moment_timebox /
-  trending). `mint_*` return `signed:false`. JSON-RPC 2.0; trending store injected (no DB coupling).
-- **`store.js`** (7/7) — zero-dep JSON persistence: moment→coin index + trending feed, de-duped, live/closed status.
-- **`frame.js`** (12/12) — Farcaster **Mini App embed** (`/m/:ref` + `/og/:ref.svg`) + **`farcasterManifest()`** +
-  **`appIconSvg()`** (the installable manifest + a 1024² summery sun icon).
-- **`app.js`** (12/12) — the deployable server: UI + descriptor APIs + `/api/record` + `/mcp` + `/health` + share/og +
-  **manifest + icon** routes. `public/index.html` = the summery Kalshi/Polymarket UI (Phil's DA), hardened + honest.
+## What works (all LIVE + verified)
+- **Mint:** browser wallet (Coinbase Wallet/MetaMask + auto-Base-switch) OR Farcaster wallet → the USER signs a real
+  Clanker `deploy()`. SDK loaded via a vendored same-origin IIFE bundle (`/vendor/xmoment-mint.js`) — no flaky CDN graph.
+- **Fee model GROUNDED** (clanker.gitbook.io): 1% swap fee; Clanker 20%; recipients split 80% → creator 40% / XMoment 40%.
+  Backend descriptor owns fees+context (validates bps=10000); frontend consumes it, swaps recipients[0]→the signer.
+- **UX honest:** mint is gas-only (no fake $0.49); 24h live window (HH:MM:SS); LIVE card only on a real on-chain addr.
+- **Buy:** the post-mint card + tradeable feed rows open `clanker.world/clanker/<addr>` (the canonical Clanker trade
+  page — resolves fresh tokens immediately; dexscreener does NOT index new v4 pools).
+- **Autonomous X agent** (`x-agent.js`): viral tweet (football lane / breaking lane) → coin → publish-GATED reply draft
+  that redirects to `/m/x:id`. Live sources: `fetchXSearch` (X API v2) + `fetchGrok` (x.ai). Bot loop: `POST /api/x-run`
+  (cron-able cycle → persists to a review queue) + `GET /api/x-queue`. **Never auto-posts** — a human posts.
+- **MCP agent-consumable + discoverable:** CORS on `/mcp`, 6 tools (incl. `x_moment`), `/.well-known/mcp.json` +
+  `agent-card.json`, `server.json` + `smithery.yaml` + `AGENTS.md` for 3rd-party agents.
+- **Installable:** `/.well-known/farcaster.json` (miniapp v1, Base) + real PNG logo (a bold X in a summery sun, $XMT).
 
-## Done this pass (2026-06-30, commits 4651ab8 · 14f8856 · bd62fca · all LIVE + verified)
-- **HARDENED** (review-workflow, 67 agents → 5 blockers): removed the ungrounded fee; stored-XSS closed (`esc()` on every
-  innerHTML + server-side sanitize on `/api/record`); failed-mint UX honest (LIVE card gated on a real on-chain address,
-  fabricated price/pool/Buy removed); walletReady race + honest "demo / not connected" header; CDN-import guard.
-- **FEE MODEL GROUNDED + corrected** (clanker.gitbook.io): swap fee = **1% (100 bps default, max 500)**, Clanker keeps
-  **20%** of LP fees, recipients split **80%** → XMoment 5000 bps = **40% of total**, creator 40%. **NO separate
-  interface bonus** (context.interface = clanker.world provenance only). Backend descriptor owns fees+context; frontend consumes it.
-- **INSTALLABLE MANIFEST** — `/.well-known/farcaster.json` + `/icon.svg` (miniapp v1, Base eip155:8453, length-checked;
-  `accountAssociation` env-driven + EMPTY until the operator signs — never fabricated).
+## Modules (92/92)
+`moment-coin.js` 13 · `tweet-moment.js` 8 · `boost-paywall.js` 9 · `x-agent.js` 15 · `store.js` 9 · `frame.js` 12 ·
+`mcp-server.js` 9 · `app.js` 17. All descriptor-only; the mint SDK is vendored in `public/vendor/xmoment-mint.js`.
 
-## Remaining — Phil-side only (can't be done autonomously / can't verify without a funded wallet)
-1. **ONE human-signed on-chain test deploy** of a moment-coin on Base (funded Farcaster wallet) → confirm the token mints,
-   the pool is created, and the XMoment address receives its 40% fee share at the grounded config. **The P1 gate.**
-2. **Signed `accountAssociation`** for the domain → env `MOMENTMINT_FC_HEADER` / `PAYLOAD` / `SIGNATURE` (makes it installable).
-3. **Real PNG assets** (1024² icon no-alpha, 200² splash, 1200×630 og) → env `MOMENTMINT_ICON_URL` / `SPLASH_URL` / `OG_URL`.
-4. The **Buy** path (one-tap swap) — waits for a real minted pool to wire honestly (the fake stub was removed).
+## Remaining — Phil-side
+1. **Activate the bot:** set `X_BEARER_TOKEN` (X search) or `XAI_API_KEY` (Grok) in Railway → cron `POST /api/x-run` →
+   review `GET /api/x-queue` → post the drafts (manual / Typefully; the account was suspended once, keep it gated).
+2. **Installable Mini App:** sign the manifest `accountAssociation` (Farcaster dev tools) → env `MOMENTMINT_FC_*`.
+3. Optional: a `/queue` review page (UX polish); the $0.49 x402 Boost (only if you want an upfront fee — the 40% slot
+   is the real revenue, so minting is intentionally free/gas-only).
 
-## Open questions for Phil
-relayer/funded wallet for the test deploy · flat mint-fee level ($0.49 vs lower) · 14-day kill number · hard-commit the
-post-Jul-19 generalize-to-creator/meme-moments pivot?
+## Next (Phil, after XMoment): bring OFFCHAIN enterprises ONCHAIN via x402
+An "x402 gateway" SaaS: a drop-in proxy that lets an offchain enterprise's existing API accept USDC micropayments on
+Base (agents pay autonomously), settled via the CDP facilitator — zero smart-contract work for them, we take a bps fee.
+Synergy with [[MainStreet]] ("safe to pay" reputation on the paying agent). Queued until XMoment's bot is running.
 
 ## Lessons
-- 2026-06-30: revenue + liquidity live on **Clanker/Zora** (Base launchers), NOT raw B20. **Clanker partner-interface =
-  40% of TOTAL fees (1% swap, Clanker keeps 20%), proven ($13M/200k tokens).** Auto-freeze is **app-level** (no native pause).
-- Earlier "0.2% swap fee" + "deployWithTokenizedFees" were WRONG — grounded to **1%** + the standard **`deploy()`**.
-  Don't carry ungrounded numbers; ground them before they ship in copy.
+- The mint SDK must be a vendored same-origin bundle, loaded via a CLASSIC `<script>` (IIFE) — esm.sh dynamic-import
+  graphs fail live ("Failed to fetch dynamically imported module"). Fresh Clanker v4 pools aren't on dexscreener → use clanker.world.
+- Revenue = the 40% Clanker fee slot, NOT an upfront fee. Minting free = more coins = more fees. Don't ship fake prices.
 
-_Last write: 2026-06-30 — 69/69 across 7 modules, all descriptor-only. HARDENED (5 review-workflow blockers) + fee model
-GROUNDED/corrected (1% swap, 40/40/20, no interface bonus, backend owns fees+context) + installable farcaster.json manifest
-+ icon, all DEPLOYED LIVE. Next = Phil's ONE human-signed on-chain test (the last gate to live minting)._
+_Last write: 2026-07-01 — 92/92, P1 gate CLEARED (first real mint $BRAOUT on Base). Buy works (clanker.world), honest
+gas-only UX, 24h window, autonomous X agent + review queue (gated on Phil's key), MCP agent-ready, installable. XMoment
+is functionally DONE; Phil activates the bot (env key) + signs the manifest. Next = the x402-enterprise gateway._
