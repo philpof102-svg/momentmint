@@ -46,6 +46,10 @@ Returns `{ queue: [ { score, reasons, action } ] }` where each `action` is the c
 draft + the per-tweet redirect link. The `football` lane scores by football tags; the `breaking` lane catches live events
 (a rocket launch, breaking news). Scoring requires a topic match, so pure-virality noise is filtered out.
 
+**The bot loop (cron-able):** `POST /api/x-run` runs one cycle — fetch live trends → coin + draft → **persist to a
+review queue** (deduped by tweet). `GET /api/x-queue` returns the pending drafts. A HUMAN approves + posts (the bot
+never auto-posts). Point a cron (Railway/GitHub Actions) at `/api/x-run` every N minutes once the env key is set.
+
 ## Fees / revenue (grounded on clanker.gitbook.io)
 Each trade pays a 1% swap fee. Clanker keeps 20%; recipients split 80% by bps. Pass your own
 `interfaceFeeRecipient` to take the platform 40% slot; the creator (your user) takes 40%.

@@ -206,11 +206,8 @@
     <div class="stage" id="stage"><div class="empty" id="empty">Pick a moment above to preview your coin ☀</div></div>
 
     <div class="cta">
-      <button class="coin" id="coinbtn" disabled onclick="coinIt()">Coin it <span class="px">· $0.49</span></button>
-      <div class="alt">
-        <button onclick="setTier('free')">Free mint <span class="px">$0</span></button>
-        <button onclick="setTier('boost')">Boost <span class="px">$1.50</span></button>
-      </div>
+      <button class="coin" id="coinbtn" disabled onclick="coinIt()">Coin it</button>
+      <div class="alt"><span class="px">you sign in your wallet · you earn 40% of every trade, forever</span></div>
     </div>
 
     <div class="sec">
@@ -373,7 +370,7 @@ async function shareCoin(){ if(!cur)return;
   try{ await navigator.clipboard.writeText(url); }catch(e){}
   try{ window.open('https://x.com/intent/tweet?text='+encodeURIComponent(text)+'&url='+encodeURIComponent(url),'_blank'); }catch(e){}
   toast('●','Link copied · share to spread your coin'); }
-function buy(addr){ const a=addr||curMinted; if(!a){ toast('●','coin it first, then buy'); return; } try{ window.open('https://dexscreener.com/base/'+a,'_blank'); }catch(e){} toast('●','Opening the live market on Base ↗'); }
+function buy(addr){ const a=addr||curMinted; if(!a){ toast('●','coin it first, then buy'); return; } try{ window.open('https://clanker.world/clanker/'+a,'_blank'); }catch(e){} toast('●','Opening $'+(cur?cur.tk:'')+' on Clanker ↗'); }
 
 let feed=[];
 function feedRow(c){const a=(c.addr&&/^0x[a-fA-F0-9]{40}$/.test(c.addr))?c.addr:''; return `<div class="coinrow ${c.closed?'closed':''}"${a?` onclick="buy('${a}')" style="cursor:pointer"`:''}><div class="mini">${esc(c.em)}</div>

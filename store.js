@@ -35,6 +35,18 @@ function createStore(file = DEFAULT_FILE) {
       return load(file).coins.slice(0, limit).map(c => ({ ...c, closed: c.closed || (Number.isInteger(c.endSec) ? now > c.endSec : false) }));
     },
     all() { return load(file).coins; },
+    /** queue a reply DRAFT for human review (dedupe by tweetId, newest first). The bot fills this; a HUMAN posts. */
+    queueDraft(d) {
+      if (!d || !d.tweetId) return 0;
+      const db = load(file);
+      db.drafts = (db.drafts || []).filter((x) => x.tweetId !== d.tweetId);
+      const now = Number.isInteger(d.queuedSec) ? d.queuedSec : Math.floor(Date.now() / 1000);
+      db.drafts.unshift({ status: 'pending', ...d, queuedSec: now });
+      save(file, db);
+      return db.drafts.length;
+    },
+    /** the pending reply drafts (the review queue a human posts from) */
+    drafts(limit = 50) { return (load(file).drafts || []).slice(0, limit); },
     clear() { save(file, { coins: [] }); },
   };
 }
@@ -54,6 +66,10 @@ if (require.main === module) {
   const list = s.list(20, NOW);
   const seeded = createStore(tmp); // re-seed should be a no-op (not empty)
   const seedN = seeded.seed([{ nm: 'X', tk: 'X', ref: 'x' }]);
+  s.queueDraft({ tweetId: 't1', ticker: 'AAA', reply: 'hi', queuedSec: NOW });
+  s.queueDraft({ tweetId: 't2', ticker: 'BBB', reply: 'yo', queuedSec: NOW });
+  s.queueDraft({ tweetId: 't1', ticker: 'AAA2', reply: 'hi again', queuedSec: NOW + 1 }); // dedupe t1
+  const drafts = s.drafts();
 
   const checks = [
     ['records persist + most-recent first', list.length >= 1 && list[0].ref === 'wc:fra:71'],
@@ -62,6 +78,8 @@ if (require.main === module) {
     ['ended coin (endSec < now) → closed:true', list.find(c => c.ref === 'wc:ht').closed === true],
     ['default price/change applied on record', list.find(c => c.ref === 'wc:fra:71').pr === '$0.0008'],
     ['seed() is a no-op when store is non-empty', seedN > 1],
+    ['queueDraft persists + drafts() newest-first, dedupe by tweetId', drafts.length === 2 && drafts[0].tweetId === 't1' && drafts[0].ticker === 'AAA2'],
+    ['drafts default to pending (a human posts)', drafts.every(d => d.status === 'pending')],
     ['no signing/funds surface', !Object.keys(module.exports).some(k => /sign|send|transfer|deploy|charge/i.test(k))],
   ];
   console.log('list:', JSON.stringify(s.list(5, NOW).map(c => ({ tk: c.tk, closed: c.closed }))));
