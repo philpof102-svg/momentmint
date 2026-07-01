@@ -21,7 +21,7 @@ const { tweetMoment } = require('./tweet-moment');
 const { boostPaywall } = require('./boost-paywall');
 const { dispatch, SERVER, TOOLS } = require('./mcp-server');
 const { createStore } = require('./store');
-const { coinSharePage, coinOgSvg, farcasterManifest, appIconSvg } = require('./frame');
+const { coinSharePage, coinOgSvg, farcasterManifest, appIconSvg, queuePage } = require('./frame');
 const { xMomentAction, runOnce, fetchTrending } = require('./x-agent');
 
 const ROOT = path.join(__dirname, 'public');
@@ -141,6 +141,8 @@ function createServer() {
       }
       // app icon (summery sun) — used by the manifest iconUrl/splashImageUrl
       if (req.method === 'GET' && url === '/icon.svg') { res.writeHead(200, { 'content-type': 'image/svg+xml; charset=utf-8' }); return res.end(appIconSvg()); }
+      // human review page for the bot's pending reply drafts (a human posts; nothing auto-publishes)
+      if (req.method === 'GET' && url === '/queue') { res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); return res.end(queuePage(store.drafts(50))); }
       // MCP discovery for autonomous agents: where the streamable-http endpoint is + the tool surface (descriptor-only, never posts).
       if (req.method === 'GET' && url === '/.well-known/mcp.json') {
         const b = appBase(req);
@@ -177,6 +179,21 @@ module.exports = { createServer };
 if (require.main === module) {
   if (!process.argv.includes('--selftest')) {
     createServer().listen(process.env.PORT || 4505, () => console.log('XMoment live on :' + (process.env.PORT || 4505) + ' (UI + /api/* descriptors + /mcp + /health)'));
+    // AUTO BOT LOOP: if an X/Grok key is set, queue trend→coin→reply DRAFTS every BOT_INTERVAL_MIN. Dormant without a key; NEVER posts.
+    if (process.env.X_BEARER_TOKEN || process.env.XAI_API_KEY) {
+      const mins = Math.max(5, Number(process.env.BOT_INTERVAL_MIN) || 15);
+      const useGrok = !!process.env.XAI_API_KEY && !process.env.X_BEARER_TOKEN;
+      const selfUrl = process.env.XMOMENT_URL || 'https://momentmint-production.up.railway.app';
+      const runBot = async () => {
+        try {
+          const picks = await fetchTrending({ appUrl: selfUrl, creator: PLATFORM, interfaceFeeRecipient: PLATFORM, trend: process.env.BOT_TREND || 'football', source: useGrok ? 'grok' : undefined, bearerToken: process.env.X_BEARER_TOKEN, apiKey: process.env.XAI_API_KEY, limit: 5 });
+          picks.forEach((p) => store.queueDraft({ tweetId: p.action.tweetId, ticker: p.action.ticker, coinRef: p.action.coinRef, link: p.action.link, reply: p.action.reply, score: p.score }));
+          if (picks.length) console.log('[xmoment bot] queued ' + picks.length + ' draft(s) → /queue');
+        } catch (e) { console.log('[xmoment bot] cycle error: ' + e.message); }
+      };
+      setInterval(runBot, mins * 60 * 1000); runBot();
+      console.log('[xmoment bot] auto-loop ON (' + (useGrok ? 'grok' : 'x-search') + ', every ' + mins + 'm) — drafts to /queue; a HUMAN posts');
+    }
   } else {
     const srv = createServer();
     srv.listen(0, async () => {
@@ -201,6 +218,7 @@ if (require.main === module) {
       const xtrend = await post('/api/x-trending', { trend: 'football' });
       const xqueue = await get('/api/x-queue');
       const xrun = await post('/api/x-run', { trend: 'football' });
+      const qpage = await get('/queue');
 
       const checks = [
         ['GET /health → ok + descriptorOnly', health.status === 200 && JSON.parse(health.body).descriptorOnly === true],
@@ -220,6 +238,7 @@ if (require.main === module) {
         ['POST /api/x-trending → live trend-following gated on env creds (400 without X_BEARER_TOKEN)', xtrend.status === 400 && /X_BEARER_TOKEN/.test(JSON.stringify(xtrend.body))],
         ['GET /api/x-queue → the bot review queue (drafts array a human posts from)', xqueue.status === 200 && Array.isArray(JSON.parse(xqueue.body).drafts)],
         ['POST /api/x-run → bot cycle gated on env creds (400 without keys)', xrun.status === 400],
+        ['GET /queue → human review page for the bot drafts', qpage.status === 200 && /review queue/.test(qpage.body)],
       ];
       console.log('XMoment server self-test:');
       let pass = 0; for (const [n, ok] of checks) { console.log(ok ? 'PASS' : 'FAIL', '·', n); if (ok) pass++; }

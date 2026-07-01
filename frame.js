@@ -128,7 +128,29 @@ function farcasterManifest(opts = {}) {
   };
 }
 
-module.exports = { miniAppEmbed, coinSharePage, coinOgSvg, appIconSvg, appOgSvg, farcasterManifest };
+/** the human review queue page — the bot's pending reply DRAFTS; a human reviews + posts (nothing auto-publishes). */
+function queuePage(drafts, opts = {}) {
+  const rows = (drafts || []).map((d) => {
+    const tweetUrl = 'https://x.com/i/status/' + encodeURIComponent(String(d.tweetId || ''));
+    const replyUrl = 'https://x.com/intent/tweet?in_reply_to=' + encodeURIComponent(String(d.tweetId || '')) + '&text=' + encodeURIComponent(String(d.reply || ''));
+    return `<div class="d"><div class="h"><span class="tk">$${escHtml(String(d.ticker || ''))}</span><span class="sc">score ${escHtml(String(d.score || ''))}</span></div>
+      <div class="rp">${escHtml(String(d.reply || ''))}</div>
+      <div class="ax"><a class="btn" href="${escAttr(replyUrl)}" target="_blank" rel="noopener">Reply on X ↗</a>
+      <a class="btn2" href="${escAttr(tweetUrl)}" target="_blank" rel="noopener">the tweet</a>${d.link ? `<a class="btn2" href="${escAttr(String(d.link))}" target="_blank" rel="noopener">the coin</a>` : ''}</div></div>`;
+  }).join('');
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>XMoment — review queue</title><style>body{font-family:system-ui,sans-serif;background:#FFF3DE;color:#2A1A05;margin:0;padding:20px;max-width:640px;margin:0 auto}
+h1{font-size:22px;margin-bottom:2px} .sub{color:#7A6336;font-size:13px;margin:0 0 18px} .d{background:#fff;border:1px solid #EBC78A;border-radius:14px;padding:14px;margin:0 0 12px}
+.h{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px} .tk{font-family:ui-monospace,monospace;font-weight:800;color:#EB5E00} .sc{color:#7A6336;font-size:12px}
+.rp{white-space:pre-wrap;font-size:14px;line-height:1.5;background:#FFF7E6;border-radius:9px;padding:10px} .ax{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.btn{background:linear-gradient(135deg,#FFD23D,#FF6A00);color:#3a1c00;font-weight:800;text-decoration:none;padding:9px 16px;border-radius:11px;font-size:13px}
+.btn2{color:#7A6336;text-decoration:none;padding:9px 12px;border-radius:11px;font-size:13px;border:1px solid #EBC78A} .empty{color:#7A6336;text-align:center;padding:40px;line-height:1.6}</style></head>
+<body><h1>☀ XMoment — review queue</h1><div class="sub">The bot drafts; you post. Nothing is auto-published.${drafts && drafts.length ? ' · ' + drafts.length + ' pending' : ''}</div>
+${(drafts && drafts.length) ? rows : '<div class="empty">No drafts yet. The bot fills this once a trend key is set (X_BEARER_TOKEN or XAI_API_KEY) and the auto-loop / POST /api/x-run runs.</div>'}
+</body></html>`;
+}
+
+module.exports = { miniAppEmbed, coinSharePage, coinOgSvg, appIconSvg, appOgSvg, farcasterManifest, queuePage };
 
 // ---- SELF-TEST (the checker) ---------------------------------------------
 if (require.main === module) {
@@ -150,6 +172,8 @@ if (require.main === module) {
     ['manifest: field length limits respected (subtitle<=30, description<=170, tags<=5 each<=20, tagline<=30)', (() => { const a = farcasterManifest().miniapp; return a.subtitle.length <= 30 && a.description.length <= 170 && a.tags.length <= 5 && a.tags.every(t => t.length <= 20) && a.tagline.length <= 30; })()],
     ['manifest: accountAssociation NOT fabricated (empty signature until the operator signs the domain)', farcasterManifest().accountAssociation.signature === ''],
     ['app icon: 1024x1024 summery sun, solid bg (no alpha when rasterized)', /width="1024" height="1024"/.test(appIconSvg()) && /linearGradient/.test(appIconSvg()) && /fill="#FFF3DE"/.test(appIconSvg())],
+    ['queue page: renders a draft with a Reply-on-X intent + the reply text (human posts)', (() => { const q = queuePage([{ tweetId: '9', ticker: 'ABC', reply: 'coined $ABC on Base', link: 'https://x/m', score: 88 }]); return /review queue/.test(q) && /\$ABC/.test(q) && /intent\/tweet\?in_reply_to=9/.test(q) && /coined \$ABC/.test(q); })()],
+    ['queue page: honest empty state when no drafts', /No drafts yet/.test(queuePage([]))],
     ['no signing/funds surface', !Object.keys(module.exports).some(k => /sign|send|deploy|charge|transfer/i.test(k))],
   ];
   console.log('embed:', JSON.stringify(embed.button));
