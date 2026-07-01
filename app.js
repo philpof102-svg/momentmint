@@ -54,6 +54,23 @@ const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-methods
 const json = (res, code, obj, extra) => { res.writeHead(code, { 'content-type': 'application/json', ...CORS, ...(extra || {}) }); res.end(JSON.stringify(obj)); };
 const body = (req) => new Promise((r) => { let b = ''; req.on('data', (c) => { b += c; if (b.length > 1e6) req.destroy(); }); req.on('end', () => { try { r(b ? JSON.parse(b) : {}); } catch { r(null); } }); });
 
+// DOGFOOD: enrich real-addr coins with LIVE market data from our own xsignal ingredient (best-effort, 60s cache).
+const XSIGNAL_URL = (process.env.XSIGNAL_URL || 'https://xsignal-production.up.railway.app').replace(/\/$/, '');
+const _mkt = new Map(); // addr → { at, data }
+async function marketFor(addr) {
+  if (!/^0x[a-fA-F0-9]{40}$/.test(String(addr || ''))) return null;
+  const c = _mkt.get(addr), now = Date.now();
+  if (c && now - c.at < 60000) return c.data;
+  try {
+    const r = await fetch(XSIGNAL_URL + '/token/preview?addr=' + addr);
+    const t = r.ok ? await r.json() : null;
+    const data = (t && t.priceUsd != null) ? { pr: '$' + t.priceUsd, liqUsd: t.liquidityUsd, flags: t.flags } : null;
+    _mkt.set(addr, { at: now, data });
+    return data;
+  } catch (e) { return null; }
+}
+const enrichFeed = (feed) => Promise.all((feed || []).map(async (c) => { if (!c.addr) return c; const m = await marketFor(c.addr); return m ? { ...c, ...m } : c; }));
+
 function createServer() {
   return http.createServer(async (req, res) => {
     const url = (req.url || '/').split('?')[0];
@@ -114,7 +131,7 @@ function createServer() {
       }
       // the review queue: pending reply drafts a HUMAN approves + posts on X (the bot never auto-posts)
       if (req.method === 'GET' && url === '/api/x-queue') return json(res, 200, { drafts: store.drafts(50) });
-      if (req.method === 'GET' && url === '/api/trending') return json(res, 200, { feed: store.list() });
+      if (req.method === 'GET' && url === '/api/trending') return json(res, 200, { feed: await enrichFeed(store.list()) });
       if (req.method === 'POST' && url === '/api/record') {
         const a = await body(req) || {};
         if (!a.tk || !a.ref) return json(res, 400, { error: 'tk + ref required' });
