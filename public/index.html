@@ -327,14 +327,27 @@ function preview(m){cur=m; timers.forEach(clearInterval); timers=[];
     <div class="badges"><span class="bdg good">creator earns 40%</span><span class="bdg">you +40% as the app</span>${by}</div>
     <div class="clock"><span class="l">live window closes in</span><span class="cd" id="cd">--:--</span></div>
     <div class="disc">closes at full-time — the coin still trades on-chain after, trade at your own risk. not investment advice.</div></div>`;
-  startCd(document.getElementById('cd'),m.secs);}
-function startCd(el,secs){function tick(){if(secs<=0){el.textContent='CLOSED'; el.classList.add('warm'); return;}
-  const h=Math.floor(secs/3600), m=Math.floor((secs%3600)/60), ss=secs%60, p=n=>String(n).padStart(2,'0'); el.textContent=(h>0?p(h)+':':'')+p(m)+':'+p(ss); el.classList.toggle('warm',secs<120); secs--;}
+  startCd(document.getElementById('cd'),momentEndSec(m));}
+// Anchor each moment's live window to an ABSOLUTE deadline persisted per-moment, so a page
+// refresh (or re-tapping the card) CONTINUES the same countdown instead of restarting at 24:00:00.
+function momentEndSec(m){
+  const key='xm_end_'+(m.by||m.tk||m.nm||'moment');
+  const nowS=Math.floor(Date.now()/1000);
+  let end=parseInt(localStorage.getItem(key)||'0',10);
+  if(!end||end<=nowS) { end=nowS+(m.secs||86400); try{localStorage.setItem(key,String(end));}catch(e){} }
+  return end;
+}
+// startCd now takes an ABSOLUTE end (epoch seconds) and derives the remaining time each tick —
+// so it stays correct across refreshes and never resets.
+function startCd(el,endSec){function tick(){
+  const secs=endSec-Math.floor(Date.now()/1000);
+  if(secs<=0){el.textContent='CLOSED'; el.classList.add('warm'); return;}
+  const h=Math.floor(secs/3600), m=Math.floor((secs%3600)/60), ss=secs%60, p=n=>String(n).padStart(2,'0'); el.textContent=(h>0?p(h)+':':'')+p(m)+':'+p(ss); el.classList.toggle('warm',secs<120);}
   tick(); timers.push(setInterval(tick,1000));}
 
 async function coinIt(){ if(!cur)return;
   const btn=document.getElementById('coinbtn'); btn.disabled=true; const stop=()=>{ btn.disabled=false; };
-  const nowS=Math.floor(Date.now()/1000), endS=nowS+(cur.secs||86400);
+  const nowS=Math.floor(Date.now()/1000), endS=momentEndSec(cur); // on-chain window = the exact deadline the user watched count down
   const ref = cur.by ? ('x:'+cur.by+':'+nowS) : ('m:'+cur.tk+':'+nowS); curRef=ref;
   let descriptor=null, mintedAddr=null;
   try{                                            // fetch the grounded Clanker descriptor from the live backend
