@@ -186,6 +186,12 @@ if (require.main === module) (async () => {
   let tfNoKey = false; try { await pushToTypefully('x', { fetch: mockTf }); } catch (e) { tfNoKey = true; }
   const mockXsig = async () => ({ ok: true, json: async () => ({ items: [{ author: 'a', url: 'https://x.com/i/status/1', score: 88, text: 'ETH ripping' }] }) });
   const xsig = await fetchFromXsignal('eth', { fetch: mockXsig });
+  // paid-branch coverage: a capturing mock records the URL so we can LOCK the x402 /signal route.
+  // (The free call above never asserts the path, and the opts.paid=true branch was previously unexercised end-to-end.)
+  let paidUrl = null;
+  const mockXsigPaid = async (u) => { paidUrl = u; return { ok: true, json: async () => ({ items: [{ author: 'b', url: 'https://x.com/i/status/2', score: 91, text: 'paid full signal' }] }) }; };
+  const xsigPaid = await fetchFromXsignal('eth', { fetch: mockXsigPaid, paid: true, paymentHeader: 'x402-proof' });
+  const paidPath = paidUrl && new URL(paidUrl).pathname; // expect '/signal' — NOT '/signal/preview', NOT a slashless concat
 
   const checks = [
     ['scoreTweet: a viral football tweet scores high (trend + virality + source)', sFoot.score >= 70 && sFoot.reasons.some(r => r.startsWith('trend:')) && sFoot.reasons.some(r => r.startsWith('virality:'))],
@@ -207,6 +213,9 @@ if (require.main === module) (async () => {
     ['pushToTypefully posts (Typefully SCHEDULES it; needs a key)', tf && tf.id === 555],
     ['pushToTypefully REQUIRES the Typefully key (no key -> throws)', tfNoKey === true],
     ['fetchFromXsignal: DOGFOODS our xsignal ingredient → ranked + cited items', xsig.length === 1 && xsig[0].url === 'https://x.com/i/status/1' && xsig[0].score === 88],
+    // Locks the paid route to EXACTLY /signal. pathname === (not paidUrl.includes('/signal')) is deliberate:
+    // '/signal/preview' also *contains* '/signal', so .includes would pass for the wrong route; a slashless bug parses to '/'.
+    ['fetchFromXsignal: the x402-PAID branch hits /signal (exact path; preview stays /signal/preview)', paidPath === '/signal' && xsigPaid.length === 1 && xsigPaid[0].score === 91],
   ];
   console.log('top pick:', JSON.stringify({ score: picksFoot[0] && picksFoot[0].score, ticker: action.ticker, link: action.link }));
   console.log('reply draft:', JSON.stringify(action.reply));
